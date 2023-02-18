@@ -1,16 +1,16 @@
-from sklearn.model_selection import KFold
 from sklearn.linear_model import LogisticRegression
-import numpy as np
 import pandas as pd
+from abc import ABC, abstractmethod
+from sklearn.model_selection import KFold
+import mlflow
+import numpy as np
 
-ARGS = {
+PARAMS = {
     'PL': {
-        'name': 'Polishing Labels',
         'folds': 10,
         'classifier': 'LogReg'
     },
     'STC': {
-        'name': 'Self-Training Correction',
         'folds': 10,
         'classifier': 'LogReg',
         'correction_rate': 0.8
@@ -21,9 +21,9 @@ CLASSIFIERS = {
     'LogReg': LogisticRegression
 }
 
-def get_args(algorithm):
+def get_params(algorithm):
     """
-    Get arguments for the label correction algorithm
+    Get parameters for the label correction algorithm
 
     Parameters
     ----------
@@ -33,135 +33,120 @@ def get_args(algorithm):
     Returns
     -------
     args : dict
-        Dictionary containing the arguments for the label correction algorithm
+        Dictionary containing the parameters for the label correction algorithm
     """
-    return ARGS[algorithm]
+    return PARAMS[algorithm]
 
-def apply_label_correction(X, y, algorithm, args):
-    """
-    Apply label correction algorithm
+class LabelCorrectionModel(ABC):
+    def __init__(self) -> None:
+        pass
 
-    Parameters
-    ----------
-    X : pandas.DataFrame
-        Dataframe containing the features
-    y : pandas.Series
-        Series containing the labels
-    algorithm : str
-        Label correction algorithm to use
-    args : dict
-        Dictionary containing the arguments for the label correction algorithm
+    @abstractmethod
+    def fit(self, X:pd.DataFrame, y:pd.Series):
+        pass
 
-    Returns
-    -------
-    corrected_labels : pandas.Series
-        Series containing the corrected labels
-    """
-    if algorithm == 'PL':
-        return polishing_labels(X, y, CLASSIFIERS[args['classifier']], args['folds'])
-    elif algorithm == 'STC':
-        return self_training_correction(X, y, CLASSIFIERS[args['classifier']], args['folds'], args['correction_rate'])
+    @abstractmethod
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        pass
 
-def polishing_labels(X:pd.DataFrame, y:pd.Series, classifier=LogisticRegression, n_folds=10):
-    """
-    Polishing labels algorithm
+    @abstractmethod
+    def log_params(self):
+        pass
 
-    Parameters
-    ----------
-    X : pandas.DataFrame
-        Dataframe containing the features
-    y : pandas.Series
-        Series containing the labels
-    classifier : sklearn classifier, optional, default=LogisticRegression
-        Classifier to use for the k-fold cross validation
-    n_folds : int, optional, default=10
-        Number of folds to use for the k-fold cross validation
+class SelfTrainingCorrection(LabelCorrectionModel):
+    def __init__(self, classifier, n_folds, correction_rate):
+        self.classifier = classifier
+        self.n_folds = n_folds
+        self.correction_rate = correction_rate
 
-    Returns
-    -------
-    y_corrected : pandas.Series
-        Series containing the corrected labels
-    """
+    def fit(self, X:pd.DataFrame, y:pd.Series):
+        pass
 
-    kf = KFold(n_splits=n_folds, random_state=42, shuffle=True)
-    clf_list = []
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
+        noisy = set()
 
-    for train_index, _ in kf.split(X):
-        X_train = X.loc[train_index]
-        y_train = y.loc[train_index]
+        # Split the current training data set using an n-fold cross-validation scheme
+        for train_index, test_index in kf.split(X):
+            X_train = X.loc[train_index]
+            X_test = X.loc[test_index]
+            y_train = y.loc[train_index]
+            y_test = y.loc[test_index]
 
-        clf_list.append(classifier(random_state=42).fit(X_train.values, y_train.values))
+            # For each of these n parts, a learning algorithm is trained on the other n-1 parts, resulting in n different classifiers
+            model = self.classifier(random_state=42).fit(X_train, y_train)
 
-    y_corrected = X.apply(
-        lambda x: 0 if np.mean([clf_list[i].predict([x.values])[0] for i in range(n_folds)]) < 0.5 else 1, 
-        axis=1)
+            # These n classifiers are used to tag each instance in the excluded part as either correct or mislabeled, by comparing the training label with that assigned by the classifier.
+            y_pred = pd.Series(model.predict(X_test), index=test_index)
+            
+            # The misclassified examples from the previous step are added to the noisy data set.
+            for i, value in y_pred.items():
+                if value != y_test.loc[i]:
+                    noisy.add(i)
 
-    return y_corrected
+        noisy = list(noisy)
 
-def self_training_correction(X:pd.DataFrame, y:pd.Series, classifier=LogisticRegression, n_folds=10, correction_rate=0.8):
-    """
-    Self-training correction algorithm
+        X_clean = X.drop(noisy)
+        y_clean = y.drop(noisy)
+        X_noisy = X.loc[noisy]
 
-    Parameters
-    ----------
-    X : pandas.DataFrame
-        Dataframe containing the features
-    y : pandas.Series
-        Series containing the labels
-    classifier : sklearn classifier, optional, default=LogisticRegression
-        Classifier to use for the STC algorithm
-    n_folds : int, optional, default=10
-        Number of folds to use for the STC algorithm
-    correction_rate : float, optional, default=0.8
-        Correction rate to use for the STC algorithm
+        # Build a model from the clean set and uses that to calculate the confidence that each of the instances from the noisy set is mislabeled
+        model = self.classifier(random_state=42).fit(X_clean, y_clean)
+        y_pred = pd.Series(model.predict(X_noisy), index=noisy)
+        y_prob = pd.DataFrame(model.predict_proba(X_noisy), index=noisy, columns=[0, 1])
 
-    Returns
-    -------
-    y_corrected : pandas.Series
-        Series containing the corrected labels
-    """
-    kf = KFold(n_splits=n_folds, random_state=42, shuffle=True)
-    noisy = set()
+        corrected = pd.DataFrame(columns=['y_pred', 'y_prob'])
+        for i in list(noisy):
+            if y_pred.loc[i] != y.loc[i]:
+                corrected.loc[i] = [y_pred.loc[i], y_prob.loc[i, y_pred.loc[i]]]
 
-    # Split the current training data set using an n-fold cross-validation scheme
-    for train_index, test_index in kf.split(X):
-        X_train = X.loc[train_index]
-        X_test = X.loc[test_index]
-        y_train = y.loc[train_index]
-        y_test = y.loc[test_index]
+        # The noisy instance with the highest calculated likelihood of belonging to some class that is not equal to its current class 
+        # is relabeled to the class that the classifier determined is the instance’s most likely true class. 
+        correction_n = int(self.correction_rate*len(corrected))
+        y_corrected = y.copy()
+        for i in corrected.sort_values('y_prob', ascending=False)[:correction_n].index:
+            y_corrected.loc[i] = corrected.loc[i, 'y_pred']
 
-        # For each of these n parts, a learning algorithm is trained on the other n-1 parts, resulting in n different classifiers
-        model = classifier(random_state=42).fit(X_train, y_train)
+        return y_corrected
 
-        # These n classifiers are used to tag each instance in the excluded part as either correct or mislabeled, by comparing the training label with that assigned by the classifier.
-        y_pred = pd.Series(model.predict(X_test), index=test_index)
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Self-Training Correction')
+        mlflow.log_param('correction_classifier', self.classifier.__name__)
+        mlflow.log_param('n_folds', self.n_folds)
+        mlflow.log_param('correction_rate', self.correction_rate)
+
+class PolishingLabels(LabelCorrectionModel):
+    def __init__(self, classifier, n_folds):
+        self.classifier = classifier
+        self.n_folds = n_folds
+        self.models = []
+
+    def fit(self, X:pd.DataFrame, y:pd.Series):
+        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
         
-        # The misclassified examples from the previous step are added to the noisy data set.
-        for i, value in y_pred.items():
-            if value != y_test.loc[i]:
-                noisy.add(i)
+        for train_index, _ in kf.split(X):
+            X_train = X.reset_index(drop=True).loc[train_index]
+            y_train = y.reset_index(drop=True).loc[train_index]
 
-    noisy = list(noisy)
+            self.models.append(self.classifier(random_state=42).fit(X_train.values, y_train.values))
 
-    X_clean = X.drop(noisy)
-    y_clean = y.drop(noisy)
-    X_noisy = X.loc[noisy]
 
-    # Build a model from the clean set and uses that to calculate the confidence that each of the instances from the noisy set is mislabeled
-    model = classifier(random_state=42).fit(X_clean, y_clean)
-    y_pred = pd.Series(model.predict(X_noisy), index=noisy)
-    y_prob = pd.DataFrame(model.predict_proba(X_noisy), index=noisy, columns=[0, 1])
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        return X.apply(
+            lambda x: 0 if np.mean([self.models[i].predict([x.values])[0] for i in range(self.n_folds)]) < 0.5 else 1, 
+            axis=1)
+    
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Polishing Labels')
+        mlflow.log_param('correction_classifier', self.classifier.__name__)
+        mlflow.log_param('n_folds', self.n_folds)
 
-    corrected = pd.DataFrame(columns=['y_pred', 'y_prob'])
-    for i in list(noisy):
-        if y_pred.loc[i] != y.loc[i]:
-            corrected.loc[i] = [y_pred.loc[i], y_prob.loc[i, y_pred.loc[i]]]
 
-    # The noisy instance with the highest calculated likelihood of belonging to some class that is not equal to its current class 
-    # is relabeled to the class that the classifier determined is the instance’s most likely true class. 
-    correction_n = int(correction_rate*len(corrected))
-    y_corrected = y.copy()
-    for i in corrected.sort_values('y_prob', ascending=False)[:correction_n].index:
-        y_corrected.loc[i] = corrected.loc[i, 'y_pred']
+def get_label_correction_model(X, y, algorithm, params) -> LabelCorrectionModel:
+    if algorithm == 'PL':
+        model = PolishingLabels(CLASSIFIERS[params['classifier']], params['folds'])
+    elif algorithm == 'STC':
+        model = SelfTrainingCorrection(CLASSIFIERS[params['classifier']], params['folds'], params['correction_rate'])
 
-    return y_corrected
+    model.fit(X, y)
+    return model
