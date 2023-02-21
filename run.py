@@ -25,9 +25,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Label correction testing.')
     parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['adult'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
-    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC'])
+    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg'])
+    parser.add_argument('--n_iterations', type=int, help='Number of iterations to run Cluster-based Correction', required=False, default=50)
+    parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in Cluster-based Correction', required=False, default=1000)
 
     args = parser.parse_args()
 
@@ -43,9 +45,8 @@ if __name__ == '__main__':
     X_test = X.iloc[test_idx]
     y_test = y.iloc[test_idx]
 
-    label_correction_params = get_params(args.correction_alg)
-    # TO DO - add arguments to alter default parameters and update label_correction_params dict
-    label_correction_model = get_label_correction_model(X_train, y_train, args.correction_alg, label_correction_params)
+    label_correction_params = get_params(args)
+    label_correction_model = get_label_correction_model(args.correction_alg, label_correction_params)
     y_train_corrected = label_correction_model.correct(X_train, y_train)
     y_test_corrected = label_correction_model.correct(X_test, y_test)
 

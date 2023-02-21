@@ -1,9 +1,11 @@
 from sklearn.linear_model import LogisticRegression
+from sklearn.cluster import KMeans
 import pandas as pd
 from abc import ABC, abstractmethod
 from sklearn.model_selection import KFold
 import mlflow
 import numpy as np
+import math
 
 PARAMS = {
     'PL': {
@@ -14,6 +16,11 @@ PARAMS = {
         'folds': 10,
         'classifier': 'LogReg',
         'correction_rate': 0.8
+    },
+    'CC': {
+        'clustering': 'KMeans',
+        'n_iterations': 50,
+        'n_clusters': 1000,
     }
 }
 
@@ -21,28 +28,21 @@ CLASSIFIERS = {
     'LogReg': LogisticRegression
 }
 
-def get_params(algorithm):
-    """
-    Get parameters for the label correction algorithm
+CLUSTERING = {
+    'KMeans': KMeans
+}
 
-    Parameters
-    ----------
-    algorithm : str
-        Label correction algorithm to use
+def get_params(args):
+    parameters = PARAMS[args.correction_alg]
 
-    Returns
-    -------
-    args : dict
-        Dictionary containing the parameters for the label correction algorithm
-    """
-    return PARAMS[algorithm]
+    if args.correction_alg == 'CC':
+        parameters['n_iterations'] = args.n_iterations
+        parameters['n_clusters'] = args.n_clusters
+    
+    return parameters
 
 class LabelCorrectionModel(ABC):
     def __init__(self) -> None:
-        pass
-
-    @abstractmethod
-    def fit(self, X:pd.DataFrame, y:pd.Series):
         pass
 
     @abstractmethod
@@ -59,10 +59,12 @@ class SelfTrainingCorrection(LabelCorrectionModel):
         self.n_folds = n_folds
         self.correction_rate = correction_rate
 
-    def fit(self, X:pd.DataFrame, y:pd.Series):
-        pass
-
     def correct(self, X:pd.DataFrame, y:pd.Series):
+        original_index = X.index
+
+        X = X.reset_index(drop=True)
+        y = y.reset_index(drop=True)
+
         kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
         noisy = set()
 
@@ -103,11 +105,11 @@ class SelfTrainingCorrection(LabelCorrectionModel):
         # The noisy instance with the highest calculated likelihood of belonging to some class that is not equal to its current class 
         # is relabeled to the class that the classifier determined is the instance’s most likely true class. 
         correction_n = int(self.correction_rate*len(corrected))
-        y_corrected = y.copy()
+        y_corrected = y.values
         for i in corrected.sort_values('y_prob', ascending=False)[:correction_n].index:
-            y_corrected.loc[i] = corrected.loc[i, 'y_pred']
+            y_corrected[i] = corrected.loc[i, 'y_pred']
 
-        return y_corrected
+        return pd.Series(y_corrected, index=original_index)
 
     def log_params(self):
         mlflow.log_param('correction_alg', 'Self-Training Correction')
@@ -119,34 +121,80 @@ class PolishingLabels(LabelCorrectionModel):
     def __init__(self, classifier, n_folds):
         self.classifier = classifier
         self.n_folds = n_folds
-        self.models = []
-
-    def fit(self, X:pd.DataFrame, y:pd.Series):
-        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
-        
-        for train_index, _ in kf.split(X):
-            X_train = X.reset_index(drop=True).loc[train_index]
-            y_train = y.reset_index(drop=True).loc[train_index]
-
-            self.models.append(self.classifier(random_state=42).fit(X_train.values, y_train.values))
-
 
     def correct(self, X:pd.DataFrame, y:pd.Series):
-        return X.apply(
-            lambda x: 0 if np.mean([self.models[i].predict([x.values])[0] for i in range(self.n_folds)]) < 0.5 else 1, 
-            axis=1)
+        original_index = X.index
+
+        X = X.reset_index(drop=True)
+        y = y.reset_index(drop=True)
+
+        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
+        
+        models = []
+        for train_index, _ in kf.split(X):
+            X_train = X.loc[train_index]
+            y_train = y.loc[train_index]
+
+            models.append(self.classifier(random_state=42).fit(X_train.values, y_train.values))
+
+        y_corrected = X.apply(
+            lambda x: 0 if np.mean([models[i].predict([x.values])[0] for i in range(self.n_folds)]) < 0.5 else 1, 
+            axis=1).to_list()
+        
+        return pd.Series(y_corrected, index=original_index)
     
     def log_params(self):
         mlflow.log_param('correction_alg', 'Polishing Labels')
         mlflow.log_param('correction_classifier', self.classifier.__name__)
         mlflow.log_param('n_folds', self.n_folds)
 
+class ClusterBasedCorrection(LabelCorrectionModel):
+    def __init__(self, clustering, n_iterations, n_clusters):
+        self.clustering = clustering
+        self.n_iterations = n_iterations
+        self.n_clusters = n_clusters
 
-def get_label_correction_model(X, y, algorithm, params) -> LabelCorrectionModel:
+    def calc_weights(self, cluster_labels:pd.Series, label_dist, n_labels):
+        d = [cluster_labels.value_counts().loc[l]/len(cluster_labels) if l in cluster_labels.value_counts().index else 0 for l in range(n_labels)]
+        u = 1/n_labels
+        multiplier = min(math.log(len(cluster_labels), 10), 2)
+
+        return [multiplier * ((d[l] - u)/label_dist[l]) for l in range(n_labels)]
+
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        original_index = X.index
+
+        X = X.reset_index(drop=True)
+        y = y.reset_index(drop=True)
+
+        n_labels = len(y.unique())
+        label_totals = [y.value_counts().loc[l]/len(y) for l in range(n_labels)]
+        ins_weights = np.zeros((X.shape[0], n_labels))
+
+        for i in range(1, self.n_iterations+1):
+            k = int((i/self.n_iterations) * self.n_clusters + 2) # on the original paper, the number of clusters varies from 2 to half of the number of samples
+            C = self.clustering(n_clusters=k, random_state=42).fit(X)
+
+            clusters = pd.Series(C.labels_, index=X.index)
+            cluster_weights = {c: self.calc_weights(y.loc[clusters == c], label_totals, n_labels) for c in range(k)}
+            
+            for idx in X.index:
+                ins_weights[idx] += cluster_weights[C.labels_[idx]]
+
+        y_corrected = [np.argmax(ins_weights[idx]) for idx in X.index]
+        return pd.Series(y_corrected, index=original_index)
+
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Cluster-Based Correction')
+        mlflow.log_param('clustering', self.clustering.__name__)
+        mlflow.log_param('n_iterations', self.n_iterations)
+        mlflow.log_param('n_clusters', self.n_clusters)
+
+
+def get_label_correction_model(algorithm, params) -> LabelCorrectionModel:
     if algorithm == 'PL':
-        model = PolishingLabels(CLASSIFIERS[params['classifier']], params['folds'])
+        return PolishingLabels(CLASSIFIERS[params['classifier']], params['folds'])
     elif algorithm == 'STC':
-        model = SelfTrainingCorrection(CLASSIFIERS[params['classifier']], params['folds'], params['correction_rate'])
-
-    model.fit(X, y)
-    return model
+        return SelfTrainingCorrection(CLASSIFIERS[params['classifier']], params['folds'], params['correction_rate'])
+    elif algorithm == 'CC':
+        return ClusterBasedCorrection(CLUSTERING[params['clustering']], params['n_iterations'], params['n_clusters'])
