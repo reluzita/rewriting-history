@@ -1,8 +1,11 @@
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.cluster import KMeans
 import pandas as pd
 from abc import ABC, abstractmethod
 from sklearn.model_selection import KFold
+import random
 import mlflow
 import numpy as np
 import math
@@ -20,7 +23,10 @@ PARAMS = {
     'CC': {
         'clustering': 'KMeans',
         'n_iterations': 50,
-        'n_clusters': 1000,
+        'n_clusters': 1000
+    },
+    'HLNC': {
+        'n_clusters': 100
     }
 }
 
@@ -190,6 +196,71 @@ class ClusterBasedCorrection(LabelCorrectionModel):
         mlflow.log_param('n_iterations', self.n_iterations)
         mlflow.log_param('n_clusters', self.n_clusters)
 
+class HybridLabelNoiseCorrection(LabelCorrectionModel):
+    def __init__(self, n_clusters):
+        self.n_clusters = n_clusters
+    
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        original_index = X.index
+
+        X = X.reset_index(drop=True)
+        y = y.reset_index(drop=True)
+
+        data = X.copy()
+        data['y'] = y
+
+        C = KMeans(n_clusters=100, random_state=0).fit(data)
+        clusters = pd.Series(C.labels_, index=X.index)
+        cluster_labels = [1 if x[7] > 0.5 else 0 for x in C.cluster_centers_]    
+
+        high_conf = []
+        low_conf = []
+
+        for i in data.index:
+            if cluster_labels[clusters.loc[i]] == y.loc[i]:
+                high_conf.append(i)
+            else:
+                low_conf.append(i)
+
+        y_corrected = y.copy()
+
+        while len(low_conf) > self.n_clusters:
+            # SSK-Means
+            seed_set = data.loc[high_conf]
+
+            C = KMeans(n_clusters=self.n_clusters, random_state=0).fit(seed_set)
+            cluster_labels = [1 if x[7] > 0.5 else 0 for x in C.cluster_centers_] 
+            centers = np.array([x[:7] for x in C.cluster_centers_])
+
+            C_ss = KMeans(n_clusters=self.n_clusters, random_state=0, init=centers, n_init=1).fit(X.loc[low_conf])
+            y_pred_sskmeans = [cluster_labels[x] for x in C_ss.labels_]
+
+            # Co-training
+            # should the feature sets be randomized each iteration?
+            features_dt = random.sample(list(X.columns), len(X.columns)//2)
+            features_svm = [col for col in X.columns if col not in features_dt]
+
+            dt = DecisionTreeClassifier(random_state=42).fit(X.loc[high_conf, features_dt], y_corrected.loc[high_conf])
+            svm = SVC(random_state=42).fit(X.loc[high_conf, features_svm], y_corrected.loc[high_conf])
+
+            y_pred_dt = dt.predict(X.loc[low_conf, features_dt])
+            y_pred_svm = svm.predict(X.loc[low_conf, features_svm])
+
+            # Correct labels if classifiers agree, else send back to low confidence data
+            for i in range(len(low_conf)):
+                if y_pred_dt[i] == y_pred_svm[i] and y_pred_dt[i] == y_pred_sskmeans[i]:
+                    high_conf.append(low_conf[i])
+                    y_corrected.loc[low_conf[i]] = y_pred_dt[i]
+                    
+            low_conf = [x for x in low_conf if x not in high_conf]
+
+        return pd.Series(y_corrected.values, index=original_index)
+    
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Hybrid Label Noise Correction')
+        mlflow.log_param('n_clusters', self.n_clusters)
+        
+
 
 def get_label_correction_model(algorithm, params) -> LabelCorrectionModel:
     if algorithm == 'PL':
@@ -198,3 +269,5 @@ def get_label_correction_model(algorithm, params) -> LabelCorrectionModel:
         return SelfTrainingCorrection(CLASSIFIERS[params['classifier']], params['folds'], params['correction_rate'])
     elif algorithm == 'CC':
         return ClusterBasedCorrection(CLUSTERING[params['clustering']], params['n_iterations'], params['n_clusters'])
+    elif algorithm == 'HLNC':
+        return HybridLabelNoiseCorrection(params['n_clusters'])
