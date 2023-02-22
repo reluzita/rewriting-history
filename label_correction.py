@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 import pandas as pd
 from abc import ABC, abstractmethod
 from sklearn.model_selection import KFold
+from sklearn.ensemble import BaggingClassifier
 import random
 import mlflow
 import numpy as np
@@ -27,6 +28,9 @@ PARAMS = {
     },
     'HLNC': {
         'n_clusters': 100
+    },
+    'OBNC': {
+        'threshold': 0.2
     }
 }
 
@@ -259,6 +263,43 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
     def log_params(self):
         mlflow.log_param('correction_alg', 'Hybrid Label Noise Correction')
         mlflow.log_param('n_clusters', self.n_clusters)
+
+class OrderingBasedCorrection(LabelCorrectionModel):
+    def __init__(self, threshold):
+        self.threshold = threshold
+
+    def calculate_margins(self, X, y, bagging:BaggingClassifier):
+        margins = pd.Series(dtype=float)
+        for i in X.index:
+            preds = pd.Series([dt.predict(X.loc[i].values.reshape(1, -1))[0] for dt in bagging.estimators_])
+            true_y = y.loc[i]
+
+            v_y = preds.value_counts().loc[true_y]
+            v_c = len(preds) - v_y
+            
+            margin = (v_y - v_c) / len(preds)
+            margins.loc[i] = margin
+
+        return margins
+
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        y_corrected = y.copy()
+
+        bagging = BaggingClassifier(n_estimators=100, random_state=42).fit(X, y)
+        y_pred = pd.Series(bagging.predict(X), index=y.index)
+        misclassified = [i for i in y.index if y.loc[i] != y_pred.loc[i]]
+
+        margins = self.calculate_margins(X.loc[misclassified], y.loc[misclassified], bagging)
+        margins = margins.apply(lambda x: abs(x)).sort_values(ascending=False)
+
+        correct = margins.loc[margins > self.threshold].index
+        y_corrected.loc[correct] = y_pred.loc[correct]
+
+        return y_corrected
+    
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Ordering-Based Correction')
+        mlflow.log_param('threshold', self.threshold)
         
 
 
@@ -271,3 +312,5 @@ def get_label_correction_model(algorithm, params) -> LabelCorrectionModel:
         return ClusterBasedCorrection(CLUSTERING[params['clustering']], params['n_iterations'], params['n_clusters'])
     elif algorithm == 'HLNC':
         return HybridLabelNoiseCorrection(params['n_clusters'])
+    elif algorithm == 'OBNC':
+        return OrderingBasedCorrection(params['threshold'])
