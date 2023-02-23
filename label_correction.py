@@ -12,45 +12,9 @@ import numpy as np
 import math
 from tqdm import tqdm
 
-PARAMS = {
-    'PL': {
-        'folds': 10,
-        'classifier': 'LogReg'
-    },
-    'STC': {
-        'folds': 10,
-        'classifier': 'LogReg',
-        'correction_rate': 0.8
-    },
-    'CC': {
-        'clustering': 'KMeans',
-        'n_iterations': 10,
-        'n_clusters': 100
-    },
-    'HLNC': {
-        'n_clusters': 100
-    },
-    'OBNC': {
-        'threshold': 0.2
-    }
-}
-
 CLASSIFIERS = {
     'LogReg': LogisticRegression
 }
-
-CLUSTERING = {
-    'KMeans': KMeans
-}
-
-def get_params(args):
-    parameters = PARAMS[args.correction_alg]
-
-    if args.correction_alg == 'CC':
-        parameters['n_iterations'] = args.n_iterations
-        parameters['n_clusters'] = args.n_clusters
-    
-    return parameters
 
 class LabelCorrectionModel(ABC):
     def __init__(self) -> None:
@@ -160,8 +124,7 @@ class PolishingLabels(LabelCorrectionModel):
         mlflow.log_param('n_folds', self.n_folds)
 
 class ClusterBasedCorrection(LabelCorrectionModel):
-    def __init__(self, clustering, n_iterations, n_clusters):
-        self.clustering = clustering
+    def __init__(self, n_iterations, n_clusters):
         self.n_iterations = n_iterations
         self.n_clusters = n_clusters
 
@@ -184,7 +147,7 @@ class ClusterBasedCorrection(LabelCorrectionModel):
 
         for i in tqdm(range(1, self.n_iterations+1)):
             k = int((i/self.n_iterations) * self.n_clusters + 2) # on the original paper, the number of clusters varies from 2 to half of the number of samples
-            C = self.clustering(n_clusters=k, random_state=42).fit(X)
+            C = KMeans(n_clusters=k, random_state=42).fit(X)
 
             clusters = pd.Series(C.labels_, index=X.index)
             cluster_weights = {c: self.calc_weights(y.loc[clusters == c], label_totals, n_labels) for c in range(k)}
@@ -197,7 +160,6 @@ class ClusterBasedCorrection(LabelCorrectionModel):
 
     def log_params(self):
         mlflow.log_param('correction_alg', 'Cluster-Based Correction')
-        mlflow.log_param('clustering', self.clustering.__name__)
         mlflow.log_param('n_iterations', self.n_iterations)
         mlflow.log_param('n_clusters', self.n_clusters)
 
@@ -303,15 +265,14 @@ class OrderingBasedCorrection(LabelCorrectionModel):
         mlflow.log_param('threshold', self.threshold)
         
 
-
-def get_label_correction_model(algorithm, params) -> LabelCorrectionModel:
-    if algorithm == 'PL':
-        return PolishingLabels(CLASSIFIERS[params['classifier']], params['folds'])
-    elif algorithm == 'STC':
-        return SelfTrainingCorrection(CLASSIFIERS[params['classifier']], params['folds'], params['correction_rate'])
-    elif algorithm == 'CC':
-        return ClusterBasedCorrection(CLUSTERING[params['clustering']], params['n_iterations'], params['n_clusters'])
-    elif algorithm == 'HLNC':
-        return HybridLabelNoiseCorrection(params['n_clusters'])
-    elif algorithm == 'OBNC':
-        return OrderingBasedCorrection(params['threshold'])
+def get_label_correction_model(args) -> LabelCorrectionModel:
+    if args.correction_alg == 'PL':
+        return PolishingLabels(CLASSIFIERS[args.base_classifier], args.n_folds)
+    elif args.correction_alg == 'STC':
+        return SelfTrainingCorrection(CLASSIFIERS[args.base_classifier], args.n_folds, args.correction_rate)
+    elif args.correction_alg == 'CC':
+        return ClusterBasedCorrection(args.n_iterations, args.n_clusters)
+    elif args.correction_alg == 'HLNC':
+        return HybridLabelNoiseCorrection(args.n_clusters)
+    elif args.correction_alg == 'OBNC':
+        return OrderingBasedCorrection(args.threshold)

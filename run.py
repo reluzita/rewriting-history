@@ -28,8 +28,12 @@ if __name__ == '__main__':
     parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg'])
+    parser.add_argument('--n_folds', type=int, help='Number of folds to use in PL and STC correction algorithms', required=False, default=10)
     parser.add_argument('--n_iterations', type=int, help='Number of iterations to run Cluster-based Correction', required=False, default=10)
-    parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in Cluster-based Correction', required=False, default=100)
+    parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in CC and HLNC correction algorithms', required=False, default=100)
+    parser.add_argument('--base_classifier', type=str, help='Classification algorithm for label correction', required=False, default='LogReg', choices=['LogReg'])
+    parser.add_argument('--correction_rate', type=float, help='Correction rate for Self Training Correction', required=False, default=0.8)
+    parser.add_argument('--threshold', type=float, help='Correction threshold for Ordering-based correction', required=False, default=0.2)
 
     args = parser.parse_args()
 
@@ -45,8 +49,7 @@ if __name__ == '__main__':
     X_test = X.iloc[test_idx]
     y_test = y.iloc[test_idx]
 
-    label_correction_params = get_params(args)
-    label_correction_model = get_label_correction_model(args.correction_alg, label_correction_params)
+    label_correction_model = get_label_correction_model(args)
     y_train_corrected = label_correction_model.correct(X_train, y_train)
     y_test_corrected = label_correction_model.correct(X_test, y_test)
 
