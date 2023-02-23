@@ -28,8 +28,8 @@ if __name__ == '__main__':
     parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg'])
-    parser.add_argument('--n_iterations', type=int, help='Number of iterations to run Cluster-based Correction', required=False, default=50)
-    parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in Cluster-based Correction', required=False, default=1000)
+    parser.add_argument('--n_iterations', type=int, help='Number of iterations to run Cluster-based Correction', required=False, default=10)
+    parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in Cluster-based Correction', required=False, default=100)
 
     args = parser.parse_args()
 

@@ -10,6 +10,7 @@ import random
 import mlflow
 import numpy as np
 import math
+from tqdm import tqdm
 
 PARAMS = {
     'PL': {
@@ -23,8 +24,8 @@ PARAMS = {
     },
     'CC': {
         'clustering': 'KMeans',
-        'n_iterations': 50,
-        'n_clusters': 1000
+        'n_iterations': 10,
+        'n_clusters': 100
     },
     'HLNC': {
         'n_clusters': 100
@@ -181,7 +182,7 @@ class ClusterBasedCorrection(LabelCorrectionModel):
         label_totals = [y.value_counts().loc[l]/len(y) for l in range(n_labels)]
         ins_weights = np.zeros((X.shape[0], n_labels))
 
-        for i in range(1, self.n_iterations+1):
+        for i in tqdm(range(1, self.n_iterations+1)):
             k = int((i/self.n_iterations) * self.n_clusters + 2) # on the original paper, the number of clusters varies from 2 to half of the number of samples
             C = self.clustering(n_clusters=k, random_state=42).fit(X)
 
