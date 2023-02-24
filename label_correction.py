@@ -22,7 +22,22 @@ class LabelCorrectionModel(ABC):
         pass
 
     @abstractmethod
-    def correct(self, X:pd.DataFrame, y:pd.Series):
+    def correct(self, X:pd.DataFrame, y:pd.Series) -> pd.Series:
+        """
+        Corrects the labels of the given dataset
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            Dataset features
+        y : pd.Series
+            Labels to correct
+
+        Returns
+        -------
+        y_corrected: pd.Series
+            Corrected labels
+        """
         pass
 
     @abstractmethod
@@ -30,6 +45,21 @@ class LabelCorrectionModel(ABC):
         pass
 
 class SelfTrainingCorrection(LabelCorrectionModel):
+    """
+    Self-Training Correction algorithm
+
+    Reference:
+    Nicholson, Bryce, et al. "Label noise correction methods." 2015 IEEE International Conference on Data Science and Advanced Analytics (DSAA). IEEE, 2015.
+
+    Attributes
+    ----------
+    classifier
+        Type of classifier to use 
+    n_folds : int
+        Number of folds to use
+    correction_rate : float
+        Percentage of labels to correct
+    """
     def __init__(self, classifier, n_folds, correction_rate):
         self.classifier = classifier
         self.n_folds = n_folds
@@ -94,6 +124,19 @@ class SelfTrainingCorrection(LabelCorrectionModel):
         mlflow.log_param('correction_rate', self.correction_rate)
 
 class PolishingLabels(LabelCorrectionModel):
+    """ 
+    Polishing Labels algorithm
+
+    Reference:
+    Nicholson, Bryce, et al. "Label noise correction methods." 2015 IEEE International Conference on Data Science and Advanced Analytics (DSAA). IEEE, 2015.
+
+    Attributes
+    ----------
+    classifier
+        Type of classifier to use
+    n_folds : int
+        Number of folds to use
+    """
     def __init__(self, classifier, n_folds):
         self.classifier = classifier
         self.n_folds = n_folds
@@ -125,6 +168,19 @@ class PolishingLabels(LabelCorrectionModel):
         mlflow.log_param('n_folds', self.n_folds)
 
 class ClusterBasedCorrection(LabelCorrectionModel):
+    """
+    Cluster-based correction algorithm
+
+    Reference:
+    Nicholson, Bryce, et al. "Label noise correction methods." 2015 IEEE International Conference on Data Science and Advanced Analytics (DSAA). IEEE, 2015.
+
+    Attributes
+    ----------
+    n_iterations : int
+        Number of iterations to run
+    n_clusters : int
+        Number of clusters to use
+    """
     def __init__(self, n_iterations, n_clusters):
         self.n_iterations = n_iterations
         self.n_clusters = n_clusters
@@ -165,6 +221,17 @@ class ClusterBasedCorrection(LabelCorrectionModel):
         mlflow.log_param('n_clusters', self.n_clusters)
 
 class HybridLabelNoiseCorrection(LabelCorrectionModel):
+    """ 
+    Hybrid Label Noise Correction algorithm
+
+    Reference:
+    Xu, Jiwei, Yun Yang, and Po Yang. "Hybrid label noise correction algorithm for medical auxiliary diagnosis." 2020 IEEE 18th International Conference on Industrial Informatics (INDIN). Vol. 1. IEEE, 2020.
+
+    Attributes
+    ----------
+    n_clusters : int
+        Number of clusters to use in KMeans clustering
+    """
     def __init__(self, n_clusters):
         self.n_clusters = n_clusters
     
@@ -229,6 +296,17 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
         mlflow.log_param('n_clusters', self.n_clusters)
 
 class OrderingBasedCorrection(LabelCorrectionModel):
+    """
+    Ordering-Based Correction algorithm
+
+    Reference:
+    Feng, Wei, and Samia Boukir. "Class noise removal and correction for image classification using ensemble margin." 2015 IEEE International Conference on Image Processing (ICIP). IEEE, 2015.
+
+    Attributes
+    ----------
+    threshold : float
+        Threshold for the margin of the ensemble classifier
+    """
     def __init__(self, threshold):
         self.threshold = threshold
 
@@ -267,6 +345,19 @@ class OrderingBasedCorrection(LabelCorrectionModel):
 
 
 class BayesianEntropy(LabelCorrectionModel):
+    """
+    Framework for identifying and correcting mislabeled instances
+
+    Reference:
+    Sun, Jiang-wen, et al. "Identifying and correcting mislabeled training instances." Future generation communication and networking (FGCN 2007). Vol. 1. IEEE, 2007.
+
+    Attributes
+    ----------
+    alpha : float
+        Noise rate
+    n_folds : int
+        Number of folds to use
+    """
     def __init__(self, alpha, n_folds):
         self.alpha = alpha
         self.n_folds = n_folds
@@ -321,6 +412,19 @@ class BayesianEntropy(LabelCorrectionModel):
 
 
 def get_label_correction_model(args) -> LabelCorrectionModel:
+    """
+    Initialize the label correction model
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments containing the correction algorithm and its parameters
+
+    Returns
+    -------
+    model: LabelCorrectionModel
+        Label correction model
+    """
     if args.correction_alg == 'PL':
         return PolishingLabels(CLASSIFIERS[args.base_classifier], args.n_folds)
     elif args.correction_alg == 'STC':
