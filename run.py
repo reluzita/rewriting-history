@@ -1,9 +1,8 @@
 import argparse
-from label_correction import get_label_correction_model, get_params
+from label_correction import get_label_correction_model
 from train import fit_predict
 from evaluation import evaluate
 from format_data import get_data
-from store_results import save_results
 import random
 import pandas as pd
 import numpy as np
@@ -25,7 +24,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Label correction testing.')
     parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['adult'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
-    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC'])
+    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg'])
     parser.add_argument('--n_folds', type=int, help='Number of folds to use in PL and STC correction algorithms', required=False, default=10)
@@ -34,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--base_classifier', type=str, help='Classification algorithm for label correction', required=False, default='LogReg', choices=['LogReg'])
     parser.add_argument('--correction_rate', type=float, help='Correction rate for Self Training Correction', required=False, default=0.8)
     parser.add_argument('--threshold', type=float, help='Correction threshold for Ordering-based correction', required=False, default=0.2)
+    parser.add_argument('--alpha', type=float, help='Alpha for Bayesian Entropy correction', required=False, default=0.25)
 
     args = parser.parse_args()
 
