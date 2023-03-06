@@ -14,7 +14,8 @@ import math
 from tqdm import tqdm
 
 CLASSIFIERS = {
-    'LogReg': LogisticRegression
+    'LogReg': LogisticRegression,
+    'DT': DecisionTreeClassifier
 }
 
 class LabelCorrectionModel(ABC):

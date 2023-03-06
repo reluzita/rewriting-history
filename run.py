@@ -22,22 +22,22 @@ if __name__ == '__main__':
     np.random.seed(0)
 
     parser = argparse.ArgumentParser(description='Label correction testing.')
-    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['adult'])
+    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['adult', 'german', 'compas', 'ricci', 'diabetes'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
     parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
-    parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg'])
+    parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg', 'DT'])
     parser.add_argument('--n_folds', type=int, help='Number of folds to use in PL and STC correction algorithms', required=False, default=10)
     parser.add_argument('--n_iterations', type=int, help='Number of iterations to run Cluster-based Correction', required=False, default=10)
     parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in CC and HLNC correction algorithms', required=False, default=100)
-    parser.add_argument('--base_classifier', type=str, help='Classification algorithm for label correction', required=False, default='LogReg', choices=['LogReg'])
+    parser.add_argument('--base_classifier', type=str, help='Classification algorithm for label correction', required=False, default='LogReg', choices=['LogReg', 'DT'])
     parser.add_argument('--correction_rate', type=float, help='Correction rate for Self Training Correction', required=False, default=0.8)
     parser.add_argument('--threshold', type=float, help='Correction threshold for Ordering-based correction', required=False, default=0.2)
     parser.add_argument('--alpha', type=float, help='Alpha for Bayesian Entropy correction', required=False, default=0.25)
 
     args = parser.parse_args()
 
-    mlflow.set_experiment(f'{args.dataset}_{args.correction_alg}')
+    mlflow.set_experiment(f'{args.dataset}_{args.sensitive_attr}_{args.correction_alg}')
 
     # get data
     X, y = get_data(args.dataset)
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         for test_set in ['noisy', 'corrected']:
             with mlflow.start_run(tags={'train_set':train_set, 'test_set':test_set, 'run':run_tag}) as run:
                 mlflow.log_param('dataset', args.dataset)
-                mlflow.log_param('columns', list(X.columns))
+                #mlflow.log_param('columns', list(X.columns))
                 mlflow.log_param('test_size', args.test_size)
                 
                 label_correction_model.log_params()

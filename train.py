@@ -1,7 +1,9 @@
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 CLASSIFIERS = {
-    'LogReg': LogisticRegression(random_state=42)
+    'LogReg': LogisticRegression(random_state=42),
+    'DT': DecisionTreeClassifier(random_state=42)
 }
 
 def fit_predict(X_train, y_train, X_test, clf_name='LogReg'):
