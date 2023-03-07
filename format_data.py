@@ -50,6 +50,7 @@ def get_data(dataset):
         data, _, _, _ = openml.datasets.get_dataset(45039).get_data(dataset_format="dataframe")
 
         data['y'] = data['twoyearrecid'].astype('int')
+        data = data.drop('twoyearrecid', axis=1)
 
     elif dataset == 'ricci':
         data, _, _, _ = openml.datasets.get_dataset(42665).get_data(dataset_format="dataframe")

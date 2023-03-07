@@ -100,8 +100,12 @@ class SelfTrainingCorrection(LabelCorrectionModel):
         X_noisy = X.loc[noisy]
 
         if y_clean.unique().shape[0] == 1:
-            print('After noise correction all labels are the same')
-            return pd.Series([y_clean.unique()[0]]*len(y), index=original_index)
+            print('All selected clean labels are the same, returning original labels')
+            return pd.Series(y.values, index=original_index)
+        
+        if len(noisy) == 0:
+            print('All labels are clean, returning original labels')
+            return pd.Series(y.values, index=original_index)
 
         # Build a model from the clean set and uses that to calculate the confidence that each of the instances from the noisy set is mislabeled
         model = self.classifier(random_state=42).fit(X_clean, y_clean)
@@ -207,8 +211,16 @@ class ClusterBasedCorrection(LabelCorrectionModel):
         label_totals = [y.value_counts().loc[l]/len(y) for l in range(n_labels)]
         ins_weights = np.zeros((X.shape[0], n_labels))
 
+        if len(X) < self.n_clusters:
+            print('Number of samples is less than the number of clusters, using half of the samples as the number of clusters')
+            self.n_clusters = int(len(X)/2)
+
         for i in range(1, self.n_iterations+1):
-            k = int((i/self.n_iterations) * self.n_clusters + 2) # on the original paper, the number of clusters varies from 2 to half of the number of samples
+            k = int((i/self.n_iterations) * self.n_clusters) # on the original paper, the number of clusters varies from 2 to half of the number of samples
+
+            if k == 0:
+                k = 2
+
             C = KMeans(n_clusters=k, random_state=42).fit(X)
 
             clusters = pd.Series(C.labels_, index=X.index)
@@ -249,7 +261,11 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
         data = X.copy()
         data['y'] = y
 
-        C = KMeans(n_clusters=100, random_state=0).fit(data)
+        if len(data) < self.n_clusters:
+            print('Number of samples is less than the number of clusters, using half of the samples as the number of clusters')
+            self.n_clusters = int(len(data)/2)
+
+        C = KMeans(n_clusters=self.n_clusters, random_state=0).fit(data)
         clusters = pd.Series(C.labels_, index=X.index)
         cluster_labels = [1 if x[-1] > 0.5 else 0 for x in C.cluster_centers_]    
 
@@ -282,7 +298,7 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
 
 
             if y_corrected.loc[high_conf].unique().shape[0] == 1:
-                print('All high confidence labels are the same, skipping co-training')
+                print('All high confidence labels are the same, co-training will return the same label')
                 y_pred_dt = [y_corrected.loc[high_conf].unique()[0]] * len(low_conf)
                 y_pred_svm = [y_corrected.loc[high_conf].unique()[0]] * len(low_conf)
             else:      
@@ -327,7 +343,11 @@ class OrderingBasedCorrection(LabelCorrectionModel):
             preds = pd.Series([dt.predict(X.loc[i].values.reshape(1, -1))[0] for dt in bagging.estimators_])
             true_y = y.loc[i]
 
-            v_y = preds.value_counts().loc[true_y]
+            if true_y not in preds.unique():
+                v_y = 0
+            else:
+                v_y = preds.value_counts().loc[true_y]
+                
             v_c = len(preds) - v_y
             
             margin = (v_y - v_c) / len(preds)
@@ -401,20 +421,22 @@ class BayesianEntropy(LabelCorrectionModel):
         entropy, y_pred = self.evaluate(X, y)
         threshold = entropy.sort_values(ascending=True, ignore_index=True)[int(self.alpha*len(entropy))]
 
-        changed = True
         y_corrected = y.copy()
 
-        while changed:
-            changed = False
+        while True:
+            stop = False
 
             for i in y_corrected.index:
                 if entropy.loc[i] < threshold and y_corrected.loc[i] != y_pred.loc[i]:
                     y_corrected.loc[i] = y_pred.loc[i]
-                    changed = True
+                    stop = True
+
+            if stop:
+                return pd.Series(y_corrected.values, index=original_index)
 
             entropy, y_pred = self.evaluate(X, y_corrected)
 
-        return pd.Series(y_corrected.values, index=original_index)
+        
     
     def log_params(self):
         mlflow.log_param('correction_alg', 'BE')
