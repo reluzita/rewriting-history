@@ -10,6 +10,7 @@ from label_correction import get_label_correction_model
 from train import fit_predict
 from evaluation import evaluate
 from format_data import get_data
+from sklearn.model_selection import train_test_split
 
 logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger(__name__)
@@ -38,16 +39,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     mlflow.set_experiment(f'{args.dataset}_{args.sensitive_attr}_{args.correction_alg}')
+    print(f'Starting experiment: {args.dataset}_{args.sensitive_attr}_{args.correction_alg}')
 
     # get data
     X, y = get_data(args.dataset)
 
     # split data
-    test_idx = random.sample(range(len(X)), int(len(X) * args.test_size))
-    X_train = X.drop(test_idx)  
-    y_train = y.drop(test_idx)
-    X_test = X.iloc[test_idx]
-    y_test = y.iloc[test_idx]
+
+    # test_idx = random.sample(range(len(X)), int(len(X) * args.test_size))
+    # X_train = X.drop(test_idx)  
+    # y_train = y.drop(test_idx)
+    # X_test = X.iloc[test_idx]
+    # y_test = y.iloc[test_idx]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=0, stratify=y)
 
     label_correction_model = get_label_correction_model(args)
     y_train_corrected = label_correction_model.correct(X_train, y_train)
@@ -68,7 +72,11 @@ if __name__ == '__main__':
                 if train_set == 'noisy':
                     y_pred = fit_predict(X_train, y_train, X_test, args.model)
                 else:
-                    y_pred = fit_predict(X_train, y_train_corrected, X_test, args.model)
+                    if y_train_corrected.unique().shape[0] == 1:
+                        y_pred = y_test_corrected.copy()
+                        print('After noise correction all labels are the same')
+                    else:
+                        y_pred = fit_predict(X_train, y_train_corrected, X_test, args.model)
                 
                 mlflow.log_param('senstive_attr', args.sensitive_attr)
 

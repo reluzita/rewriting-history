@@ -5,7 +5,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.cluster import KMeans
 import pandas as pd
 from abc import ABC, abstractmethod
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import BaggingClassifier
 import random
 import mlflow
@@ -72,11 +72,11 @@ class SelfTrainingCorrection(LabelCorrectionModel):
         X = X.reset_index(drop=True)
         y = y.reset_index(drop=True)
 
-        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
+        kf = StratifiedKFold(n_splits=self.n_folds, random_state=42, shuffle=True)
         noisy = set()
 
         # Split the current training data set using an n-fold cross-validation scheme
-        for train_index, test_index in kf.split(X):
+        for train_index, test_index in kf.split(X, y):
             X_train = X.loc[train_index]
             X_test = X.loc[test_index]
             y_train = y.loc[train_index]
@@ -98,6 +98,10 @@ class SelfTrainingCorrection(LabelCorrectionModel):
         X_clean = X.drop(noisy)
         y_clean = y.drop(noisy)
         X_noisy = X.loc[noisy]
+
+        if y_clean.unique().shape[0] == 1:
+            print('After noise correction all labels are the same')
+            return pd.Series([y_clean.unique()[0]]*len(y), index=original_index)
 
         # Build a model from the clean set and uses that to calculate the confidence that each of the instances from the noisy set is mislabeled
         model = self.classifier(random_state=42).fit(X_clean, y_clean)
@@ -148,10 +152,10 @@ class PolishingLabels(LabelCorrectionModel):
         X = X.reset_index(drop=True)
         y = y.reset_index(drop=True)
 
-        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
+        kf = StratifiedKFold(n_splits=self.n_folds, random_state=42, shuffle=True)
         
         models = []
-        for train_index, _ in kf.split(X):
+        for train_index, _ in kf.split(X, y):
             X_train = X.loc[train_index]
             y_train = y.loc[train_index]
 
@@ -203,7 +207,7 @@ class ClusterBasedCorrection(LabelCorrectionModel):
         label_totals = [y.value_counts().loc[l]/len(y) for l in range(n_labels)]
         ins_weights = np.zeros((X.shape[0], n_labels))
 
-        for i in tqdm(range(1, self.n_iterations+1)):
+        for i in range(1, self.n_iterations+1):
             k = int((i/self.n_iterations) * self.n_clusters + 2) # on the original paper, the number of clusters varies from 2 to half of the number of samples
             C = KMeans(n_clusters=k, random_state=42).fit(X)
 
@@ -247,7 +251,7 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
 
         C = KMeans(n_clusters=100, random_state=0).fit(data)
         clusters = pd.Series(C.labels_, index=X.index)
-        cluster_labels = [1 if x[7] > 0.5 else 0 for x in C.cluster_centers_]    
+        cluster_labels = [1 if x[-1] > 0.5 else 0 for x in C.cluster_centers_]    
 
         high_conf = []
         low_conf = []
@@ -265,8 +269,8 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
             seed_set = data.loc[high_conf]
 
             C = KMeans(n_clusters=self.n_clusters, random_state=0).fit(seed_set)
-            cluster_labels = [1 if x[7] > 0.5 else 0 for x in C.cluster_centers_] 
-            centers = np.array([x[:7] for x in C.cluster_centers_])
+            cluster_labels = [1 if x[-1] > 0.5 else 0 for x in C.cluster_centers_] 
+            centers = np.array([x[:-1] for x in C.cluster_centers_])
 
             C_ss = KMeans(n_clusters=self.n_clusters, random_state=0, init=centers, n_init=1).fit(X.loc[low_conf])
             y_pred_sskmeans = [cluster_labels[x] for x in C_ss.labels_]
@@ -276,11 +280,17 @@ class HybridLabelNoiseCorrection(LabelCorrectionModel):
             features_dt = random.sample(list(X.columns), len(X.columns)//2)
             features_svm = [col for col in X.columns if col not in features_dt]
 
-            dt = DecisionTreeClassifier(random_state=42).fit(X.loc[high_conf, features_dt], y_corrected.loc[high_conf])
-            svm = SVC(random_state=42).fit(X.loc[high_conf, features_svm], y_corrected.loc[high_conf])
 
-            y_pred_dt = dt.predict(X.loc[low_conf, features_dt])
-            y_pred_svm = svm.predict(X.loc[low_conf, features_svm])
+            if y_corrected.loc[high_conf].unique().shape[0] == 1:
+                print('All high confidence labels are the same, skipping co-training')
+                y_pred_dt = [y_corrected.loc[high_conf].unique()[0]] * len(low_conf)
+                y_pred_svm = [y_corrected.loc[high_conf].unique()[0]] * len(low_conf)
+            else:      
+                dt = DecisionTreeClassifier(random_state=42).fit(X.loc[high_conf, features_dt], y_corrected.loc[high_conf])
+                svm = SVC(random_state=42).fit(X.loc[high_conf, features_svm], y_corrected.loc[high_conf])
+
+                y_pred_dt = dt.predict(X.loc[low_conf, features_dt])
+                y_pred_svm = svm.predict(X.loc[low_conf, features_svm])
 
             # Correct labels if classifiers agree, else send back to low confidence data
             for i in range(len(low_conf)):
@@ -364,11 +374,11 @@ class BayesianEntropy(LabelCorrectionModel):
         self.n_folds = n_folds
 
     def evaluate(self, X:pd.DataFrame, y:pd.Series):
-        kf = KFold(n_splits=self.n_folds, random_state=42, shuffle=True)
+        kf = StratifiedKFold(n_splits=self.n_folds, random_state=42, shuffle=True)
         entropy = pd.Series(index=y.index, dtype=float)
         y_pred = pd.Series(index=y.index, dtype=int)
 
-        for train_index, test_index in kf.split(X):
+        for train_index, test_index in kf.split(X, y):
             X_train = X.loc[train_index]
             X_test = X.loc[test_index]
             y_train = y.loc[train_index]
