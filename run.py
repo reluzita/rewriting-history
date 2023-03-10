@@ -70,18 +70,19 @@ if __name__ == '__main__':
                 mlflow.log_param('classifier', args.model)
 
                 if train_set == 'noisy':
-                    y_pred = fit_predict(X_train, y_train, X_test, args.model)
+                    y_pred, y_pred_proba = fit_predict(X_train, y_train, X_test, args.model)
                 else:
                     if y_train_corrected.unique().shape[0] == 1:
                         y_pred = y_test_corrected.copy()
+                        y_pred_proba = y_test_corrected.copy()
                         print('After noise correction all labels are the same')
                     else:
-                        y_pred = fit_predict(X_train, y_train_corrected, X_test, args.model)
+                        y_pred, y_pred_proba = fit_predict(X_train, y_train_corrected, X_test, args.model)
                 
                 mlflow.log_param('senstive_attr', args.sensitive_attr)
 
                 if test_set == 'noisy':
-                    evaluate(y_test, y_pred, X_test[args.sensitive_attr])
+                    evaluate(y_test, y_pred, y_pred_proba, X_test[args.sensitive_attr])
                 else:
-                    evaluate(y_test_corrected, y_pred, X_test[args.sensitive_attr])
+                    evaluate(y_test_corrected, y_pred, y_pred_proba, X_test[args.sensitive_attr])
 

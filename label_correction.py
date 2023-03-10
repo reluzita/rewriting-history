@@ -423,17 +423,22 @@ class BayesianEntropy(LabelCorrectionModel):
 
         y_corrected = y.copy()
 
+        last_changed = []
         while True:
-            stop = False
+            stop = True
+            changed = []
 
             for i in y_corrected.index:
                 if entropy.loc[i] < threshold and y_corrected.loc[i] != y_pred.loc[i]:
                     y_corrected.loc[i] = y_pred.loc[i]
-                    stop = True
+                    stop = False
+                    changed.append(i)
 
-            if stop:
+            changed.sort()
+            if stop or changed == last_changed:
                 return pd.Series(y_corrected.values, index=original_index)
 
+            last_changed = changed
             entropy, y_pred = self.evaluate(X, y_corrected)
 
         

@@ -1,6 +1,7 @@
 import openml
 import os
 import pandas as pd
+from imblearn.under_sampling import RandomUnderSampler
 
 def get_data(dataset):
     """
@@ -75,6 +76,12 @@ def get_data(dataset):
 
     X = data.drop('y', axis=1)
     y = data['y']
+
+    if y.value_counts()[0]/len(y) < 0.2 or y.value_counts()[1]/len(y) < 0.2:
+        print('Dataset is too unbalanced, performing random undersampling')
+        X, y = RandomUnderSampler(sampling_strategy=0.5, random_state=42).fit_resample(X, y)
+        data = X.copy()
+        data['y'] = y
 
     if not os.path.exists('data'):
         os.mkdir('data')

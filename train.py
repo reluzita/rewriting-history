@@ -28,4 +28,4 @@ def fit_predict(X_train, y_train, X_test, clf_name='LogReg'):
     """
     clf = CLASSIFIERS[clf_name].fit(X_train, y_train)
 
-    return clf.predict(X_test)
+    return clf.predict(X_test), clf.predict_proba(X_test)[:, 1]

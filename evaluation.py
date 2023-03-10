@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score
 import mlflow
 from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference, false_positive_rate, false_negative_rate
 
@@ -56,7 +56,7 @@ def equal_opportunity_difference(y_true, y_pred, sensitive_attr):
 
     return abs(false_negative_rate(y_true_0, y_pred_0) - false_negative_rate(y_true_1, y_pred_1))
 
-def evaluate(y_test, y_pred, sensitive_attr):
+def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
     """
     Calculate and log evaluation metrics to MLflow
 
@@ -70,6 +70,8 @@ def evaluate(y_test, y_pred, sensitive_attr):
         Sensitive attribute
     """
     mlflow.log_metric("accuracy", accuracy_score(y_test, y_pred))
+    if len(set(y_pred_proba)) > 1 and len(y_test.unique()) > 1:
+        mlflow.log_metric("roc_auc", roc_auc_score(y_test, y_pred_proba))
     mlflow.log_metric("demographic_parity_difference", demographic_parity_difference(y_test, y_pred, sensitive_features=sensitive_attr))
     mlflow.log_metric("equalized_odds_difference", equalized_odds_difference(y_test, y_pred, sensitive_features=sensitive_attr))
     mlflow.log_metric("predictive_equality_difference", predictive_equality_difference(y_test, y_pred, sensitive_attr))
