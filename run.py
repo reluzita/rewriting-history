@@ -23,7 +23,7 @@ if __name__ == '__main__':
     np.random.seed(0)
 
     parser = argparse.ArgumentParser(description='Label correction testing.')
-    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['adult', 'german', 'compas', 'ricci', 'diabetes'])
+    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['adult', 'german', 'compas', 'ricci', 'diabetes', 'breastw', 'phishing', 'titanic', 'bank'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
     parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
@@ -45,12 +45,6 @@ if __name__ == '__main__':
     X, y = get_data(args.dataset)
 
     # split data
-
-    # test_idx = random.sample(range(len(X)), int(len(X) * args.test_size))
-    # X_train = X.drop(test_idx)  
-    # y_train = y.drop(test_idx)
-    # X_test = X.iloc[test_idx]
-    # y_test = y.iloc[test_idx]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=0, stratify=y)
 
     label_correction_model = get_label_correction_model(args)

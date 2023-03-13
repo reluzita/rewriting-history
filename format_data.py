@@ -2,6 +2,8 @@ import openml
 import os
 import pandas as pd
 from imblearn.under_sampling import RandomUnderSampler
+import random
+import numpy as np
 
 def get_data(dataset):
     """
@@ -72,6 +74,84 @@ def get_data(dataset):
         data['diabetesMed'] = data['diabetesMed'].apply(lambda x: 1 if x == 'Yes' else 0).astype('int')
         data = pd.get_dummies(data)
         data = data.drop(['gender_Female', 'gender_Unknown/Invalid'], axis=1)
+
+    elif dataset == 'breastw':
+        data, _, _, _ = openml.datasets.get_dataset(15).get_data(dataset_format="dataframe")
+        
+        data.dropna(inplace=True)
+        data['y'] = data['Class'].apply(lambda x: 1 if x == 'malignant' else 0)
+        data = data.drop('Class', axis=1)
+
+        data['Mitoses'] = data['Mitoses'].apply(lambda x: 1 if x > 1 else 0).astype('int')
+        for i in data.loc[data['Mitoses'] == 0].index:
+            if random.random() < 0.5:
+                data.loc[i, 'y'] = 1 - data.loc[i, 'y'] 
+
+    elif dataset == 'phishing':
+        data, _, _, _ = openml.datasets.get_dataset(4534).get_data(dataset_format="dataframe")
+
+        data = data.astype(int)
+        for col in data.columns:
+            if data[col].value_counts().shape[0] == 2:
+                data[col] = data[col].apply(lambda x: 1 if x == 1 else 0)
+
+        for i in data.loc[data['having_IP_Address'] == 0].index:
+            if random.random() < 0.5:
+                data.loc[i, 'Result'] = 1 - data.loc[i, 'Result']
+
+        data['y'] = data['Result']
+        data = data.drop('Result', axis=1)
+
+    elif dataset == 'titanic':
+        data, _, _, _ = openml.datasets.get_dataset(40945).get_data(dataset_format="dataframe")
+
+        data = data.drop(['cabin', 'ticket', 'boat', 'body', 'home.dest'], axis=1)
+        data['sex'] = data['sex'].apply(lambda x: 1 if x == 'male' else 0).astype('int')
+        data['title'] = data['name'].str.extract(' ([A-Za-z]+)\.', expand=False)
+        data = data.drop(columns='name')
+        data['title'] = data['title'].replace(['Dr', 'Rev', 'Col', 'Major', 'Countess', 'Sir', 'Jonkheer', 'Lady', 'Capt', 'Don'], 'Others')
+        data['title'] = data['title'].replace('Ms', 'Miss')
+        data['title'] = data['title'].replace('Mme', 'Mrs')
+        data['title'] = data['title'].replace('Mlle', 'Miss')
+        data['embarked'] = data['embarked'].fillna('S')
+        NaN_indexes = data['age'][data['age'].isnull()].index
+        for i in NaN_indexes:
+            pred_age = data['age'][((data.sibsp == data.iloc[i]["sibsp"]) & (data.parch == data.iloc[i]["parch"]) & (data.pclass == data.iloc[i]["pclass"]))].median()
+            if not np.isnan(pred_age):
+                data['age'].iloc[i] = pred_age
+            else:
+                data['age'].iloc[i] = data['age'].median()
+        for i, row in data.loc[data['fare'].isna()].iterrows():
+            data.loc[i, 'fare'] = data.loc[data['pclass'] == data.loc[i, 'pclass']].fare.median()
+        data['y'] = data['survived'].astype('int')
+        data = data.drop('survived', axis=1)
+
+        data = pd.get_dummies(data)
+
+    elif dataset == 'bank':
+        data, _, _, _ = openml.datasets.get_dataset(1461).get_data(dataset_format="dataframe")
+
+        data = data.rename(columns={
+            "V1": "age","V2": "job","V3": "marital","V4": "education","V5": "default","V6": "balance","V7": "housing","V8": "loan","V9": "contact",
+            "V10": "day","V11": "month","V12": "duration","V13": "campaign","V14": "pdays","V15": "previous","V16": "poutcome", "V17": "y"
+        })
+
+        data['education'] = data['education'].map({'unknown': np.nan, 'primary':1, 'secondary':2, 'tertiary':3}).astype(float)
+        data = data.dropna()
+
+        for c in ['default', 'housing', 'loan']:
+            data[c] = data[c].map({'no': 0, 'yes': 1}).astype(int)
+
+        data['month'] = data['month'].map({'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}).astype(int)
+        data['y'] = data['Class'].astype(int).apply(lambda x: 1 if x == 2 else 0).astype(int)
+        data = data.drop(columns=['Class'])
+
+        data = pd.get_dummies(data)
+        data = data.drop(columns=['job_unknown', 'marital_single', 'contact_unknown', 'poutcome_unknown'])
+
+        for i in data.loc[data['housing'] == 1].index:
+            if random.random() < 0.5:
+                data.loc[i, 'y'] = 1 - data.loc[i, 'y']
 
 
     X = data.drop('y', axis=1)
