@@ -5,6 +5,132 @@ from imblearn.under_sampling import RandomUnderSampler
 import random
 import numpy as np
 
+def format_adult():
+    data, _, _, _ = openml.datasets.get_dataset(43898).get_data(dataset_format="dataframe")
+    data = data.dropna().reset_index(drop=True)    
+
+    data['y'] = data['class'].apply(lambda x: 1 if x == '>50K' else 0).astype('int')
+    data = data.drop('class', axis=1)
+    data = pd.get_dummies(data)
+    data = data.drop(['native_country_?', 'workclass_?', 'occupation_?', 'sex_Female'], axis=1)
+
+    return data
+
+def format_german():
+    data, _, _, _ = openml.datasets.get_dataset(31).get_data(dataset_format="dataframe")
+
+    data['sex_Male'] = data['personal_status'].apply(lambda x: 1 if (x == 'male single' or x == 'male mar/wid' or x == 'male div/sep') else 0)
+    data['single'] = data['personal_status'].apply(lambda x: 1 if (x == 'female single' or x == 'male single') else 0)
+    data['own_telephone'] = data['own_telephone'].apply(lambda x: 1 if x == 'yes' else 0).astype('int')
+    data['foreign_worker'] = data['foreign_worker'].apply(lambda x: 1 if x == 'yes' else 0).astype('int')
+    data['y'] = data['class'].apply(lambda x: 1 if x == 'good' else 0).astype('int')
+    data = data.drop(['personal_status','class'], axis=1)
+    data = pd.get_dummies(data)
+
+    return data
+
+def format_compas():
+    data, _, _, _ = openml.datasets.get_dataset(45039).get_data(dataset_format="dataframe")
+
+    data['y'] = data['twoyearrecid'].astype('int')
+    data = data.drop('twoyearrecid', axis=1)
+
+    return data
+
+def format_ricci():
+    data, _, _, _ = openml.datasets.get_dataset(42665).get_data(dataset_format="dataframe")
+
+    data['Position_Captain'] = data['Position'].apply(lambda x: 1 if x == 'Captain' else 0).astype('int')
+    data['y'] = data['Promotion'].apply(lambda x: 1 if x == 'Promotion' else 0).astype('int')
+    data = data.drop(['Promotion', 'Position'], axis=1)
+    data = pd.get_dummies(data)
+
+    return data
+
+def format_diabetes():
+    data, _, _, _ = openml.datasets.get_dataset(43903).get_data(dataset_format="dataframe")
+
+    data['y'] = data['readmit_30_days'].astype('int')
+    data = data.drop('readmit_30_days', axis=1)
+    for col in ['medicare', 'medicaid', 'had_emergency', 'had_inpatient_days', 'had_outpatient_days']:
+        data[col] = data[col].astype('int')
+    data['change'] = data['change'].apply(lambda x: 1 if x == 'Ch' else 0).astype('int')
+    data['diabetesMed'] = data['diabetesMed'].apply(lambda x: 1 if x == 'Yes' else 0).astype('int')
+    data = pd.get_dummies(data)
+    data = data.drop(['gender_Female', 'gender_Unknown/Invalid'], axis=1)
+
+    return data
+
+def format_phishing():
+    data, _, _, _ = openml.datasets.get_dataset(4534).get_data(dataset_format="dataframe")
+
+    data = data.astype(int)
+    for col in data.columns:
+        if data[col].value_counts().shape[0] == 2:
+            data[col] = data[col].apply(lambda x: 1 if x == 1 else 0)
+
+    # for i in data.loc[data['having_IP_Address'] == 0].index:
+    #     if random.random() < 0.5:
+    #         data.loc[i, 'Result'] = 1 - data.loc[i, 'Result']
+
+    data['y'] = data['Result']
+    data = data.drop('Result', axis=1)
+
+    return data
+
+def format_titanic():
+    data, _, _, _ = openml.datasets.get_dataset(40945).get_data(dataset_format="dataframe")
+
+    data = data.drop(['cabin', 'ticket', 'boat', 'body', 'home.dest'], axis=1)
+    data['sex'] = data['sex'].apply(lambda x: 1 if x == 'male' else 0).astype('int')
+    data['title'] = data['name'].str.extract(' ([A-Za-z]+)\.', expand=False)
+    data = data.drop(columns='name')
+    data['title'] = data['title'].replace(['Dr', 'Rev', 'Col', 'Major', 'Countess', 'Sir', 'Jonkheer', 'Lady', 'Capt', 'Don'], 'Others')
+    data['title'] = data['title'].map({'Ms': 'Miss', 'Mme': 'Mrs', 'Mlle': 'Miss'})
+    data['embarked'] = data['embarked'].fillna('S')
+    NaN_indexes = data['age'][data['age'].isnull()].index
+    for i in NaN_indexes:
+        pred_age = data['age'][((data.sibsp == data.iloc[i]["sibsp"]) & (data.parch == data.iloc[i]["parch"]) & (data.pclass == data.iloc[i]["pclass"]))].median()
+        if not np.isnan(pred_age):
+            data['age'].iloc[i] = pred_age
+        else:
+            data['age'].iloc[i] = data['age'].median()
+    for i, row in data.loc[data['fare'].isna()].iterrows():
+        data.loc[i, 'fare'] = data.loc[data['pclass'] == data.loc[i, 'pclass']].fare.median()
+    data['y'] = data['survived'].astype('int')
+    data = data.drop('survived', axis=1)
+
+    data = pd.get_dummies(data)
+
+    return data
+
+def format_bank():
+    data, _, _, _ = openml.datasets.get_dataset(1461).get_data(dataset_format="dataframe")
+
+    data = data.rename(columns={
+        "V1": "age","V2": "job","V3": "marital","V4": "education","V5": "default","V6": "balance","V7": "housing","V8": "loan","V9": "contact",
+        "V10": "day","V11": "month","V12": "duration","V13": "campaign","V14": "pdays","V15": "previous","V16": "poutcome", "V17": "y"
+    })
+
+    data['education'] = data['education'].map({'unknown': np.nan, 'primary':1, 'secondary':2, 'tertiary':3}).astype(float)
+    data = data.dropna()
+
+    for c in ['default', 'housing', 'loan']:
+        data[c] = data[c].map({'no': 0, 'yes': 1}).astype(int)
+
+    data['month'] = data['month'].map({'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}).astype(int)
+    data['y'] = data['Class'].astype(int).apply(lambda x: 1 if x == 2 else 0).astype(int)
+    data = data.drop(columns=['Class'])
+
+    data = pd.get_dummies(data)
+    data = data.drop(columns=['job_unknown', 'marital_single', 'contact_unknown', 'poutcome_unknown'])
+
+    # for i in data.loc[data['housing'] == 1].index:
+    #     if random.random() < 0.5:
+    #         data.loc[i, 'y'] = 1 - data.loc[i, 'y']
+
+    return data
+
 def get_data(dataset):
     """
     Get dataset from OpenML, format it for the experiments and save it to a csv file
@@ -29,130 +155,21 @@ def get_data(dataset):
         return X, y
     
     if dataset == 'adult':
-        data, _, _, _ = openml.datasets.get_dataset(43898).get_data(dataset_format="dataframe")
-        data = data.dropna().reset_index(drop=True)    
-
-        #X = data.drop('class', axis=1)
-        data['y'] = data['class'].apply(lambda x: 1 if x == '>50K' else 0).astype('int')
-        data = data.drop('class', axis=1)
-        data = pd.get_dummies(data)
-        data = data.drop(['native_country_?', 'workclass_?', 'occupation_?', 'sex_Female'], axis=1)
-
+        data = format_adult() 
     elif dataset == 'german':
-        data, _, _, _ = openml.datasets.get_dataset(31).get_data(dataset_format="dataframe")
-
-        data['sex_Male'] = data['personal_status'].apply(lambda x: 1 if (x == 'male single' or x == 'male mar/wid' or x == 'male div/sep') else 0)
-        data['single'] = data['personal_status'].apply(lambda x: 1 if (x == 'female single' or x == 'male single') else 0)
-        data['own_telephone'] = data['own_telephone'].apply(lambda x: 1 if x == 'yes' else 0).astype('int')
-        data['foreign_worker'] = data['foreign_worker'].apply(lambda x: 1 if x == 'yes' else 0).astype('int')
-        data['y'] = data['class'].apply(lambda x: 1 if x == 'good' else 0).astype('int')
-        data = data.drop(['personal_status','class'], axis=1)
-        data = pd.get_dummies(data)
-
+        data = format_german()
     elif dataset == 'compas':
-        data, _, _, _ = openml.datasets.get_dataset(45039).get_data(dataset_format="dataframe")
-
-        data['y'] = data['twoyearrecid'].astype('int')
-        data = data.drop('twoyearrecid', axis=1)
-
+        data = format_compas()
     elif dataset == 'ricci':
-        data, _, _, _ = openml.datasets.get_dataset(42665).get_data(dataset_format="dataframe")
-
-        data['Position_Captain'] = data['Position'].apply(lambda x: 1 if x == 'Captain' else 0).astype('int')
-        data['y'] = data['Promotion'].apply(lambda x: 1 if x == 'Promotion' else 0).astype('int')
-        data = data.drop(['Promotion', 'Position'], axis=1)
-        data = pd.get_dummies(data)
-
+        data = format_ricci()
     elif dataset == 'diabetes':
-        data, _, _, _ = openml.datasets.get_dataset(43903).get_data(dataset_format="dataframe")
-
-        data['y'] = data['readmit_30_days'].astype('int')
-        data = data.drop('readmit_30_days', axis=1)
-        for col in ['medicare', 'medicaid', 'had_emergency', 'had_inpatient_days', 'had_outpatient_days']:
-            data[col] = data[col].astype('int')
-        data['change'] = data['change'].apply(lambda x: 1 if x == 'Ch' else 0).astype('int')
-        data['diabetesMed'] = data['diabetesMed'].apply(lambda x: 1 if x == 'Yes' else 0).astype('int')
-        data = pd.get_dummies(data)
-        data = data.drop(['gender_Female', 'gender_Unknown/Invalid'], axis=1)
-
-    elif dataset == 'breastw':
-        data, _, _, _ = openml.datasets.get_dataset(15).get_data(dataset_format="dataframe")
-        
-        data.dropna(inplace=True)
-        data['y'] = data['Class'].apply(lambda x: 1 if x == 'malignant' else 0)
-        data = data.drop('Class', axis=1)
-
-        data['Mitoses'] = data['Mitoses'].apply(lambda x: 1 if x > 1 else 0).astype('int')
-        for i in data.loc[data['Mitoses'] == 0].index:
-            if random.random() < 0.5:
-                data.loc[i, 'y'] = 1 - data.loc[i, 'y'] 
-
+        data = format_diabetes()
     elif dataset == 'phishing':
-        data, _, _, _ = openml.datasets.get_dataset(4534).get_data(dataset_format="dataframe")
-
-        data = data.astype(int)
-        for col in data.columns:
-            if data[col].value_counts().shape[0] == 2:
-                data[col] = data[col].apply(lambda x: 1 if x == 1 else 0)
-
-        for i in data.loc[data['having_IP_Address'] == 0].index:
-            if random.random() < 0.5:
-                data.loc[i, 'Result'] = 1 - data.loc[i, 'Result']
-
-        data['y'] = data['Result']
-        data = data.drop('Result', axis=1)
-
+        data = format_phishing()
     elif dataset == 'titanic':
-        data, _, _, _ = openml.datasets.get_dataset(40945).get_data(dataset_format="dataframe")
-
-        data = data.drop(['cabin', 'ticket', 'boat', 'body', 'home.dest'], axis=1)
-        data['sex'] = data['sex'].apply(lambda x: 1 if x == 'male' else 0).astype('int')
-        data['title'] = data['name'].str.extract(' ([A-Za-z]+)\.', expand=False)
-        data = data.drop(columns='name')
-        data['title'] = data['title'].replace(['Dr', 'Rev', 'Col', 'Major', 'Countess', 'Sir', 'Jonkheer', 'Lady', 'Capt', 'Don'], 'Others')
-        data['title'] = data['title'].replace('Ms', 'Miss')
-        data['title'] = data['title'].replace('Mme', 'Mrs')
-        data['title'] = data['title'].replace('Mlle', 'Miss')
-        data['embarked'] = data['embarked'].fillna('S')
-        NaN_indexes = data['age'][data['age'].isnull()].index
-        for i in NaN_indexes:
-            pred_age = data['age'][((data.sibsp == data.iloc[i]["sibsp"]) & (data.parch == data.iloc[i]["parch"]) & (data.pclass == data.iloc[i]["pclass"]))].median()
-            if not np.isnan(pred_age):
-                data['age'].iloc[i] = pred_age
-            else:
-                data['age'].iloc[i] = data['age'].median()
-        for i, row in data.loc[data['fare'].isna()].iterrows():
-            data.loc[i, 'fare'] = data.loc[data['pclass'] == data.loc[i, 'pclass']].fare.median()
-        data['y'] = data['survived'].astype('int')
-        data = data.drop('survived', axis=1)
-
-        data = pd.get_dummies(data)
-
+        data = format_titanic()
     elif dataset == 'bank':
-        data, _, _, _ = openml.datasets.get_dataset(1461).get_data(dataset_format="dataframe")
-
-        data = data.rename(columns={
-            "V1": "age","V2": "job","V3": "marital","V4": "education","V5": "default","V6": "balance","V7": "housing","V8": "loan","V9": "contact",
-            "V10": "day","V11": "month","V12": "duration","V13": "campaign","V14": "pdays","V15": "previous","V16": "poutcome", "V17": "y"
-        })
-
-        data['education'] = data['education'].map({'unknown': np.nan, 'primary':1, 'secondary':2, 'tertiary':3}).astype(float)
-        data = data.dropna()
-
-        for c in ['default', 'housing', 'loan']:
-            data[c] = data[c].map({'no': 0, 'yes': 1}).astype(int)
-
-        data['month'] = data['month'].map({'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}).astype(int)
-        data['y'] = data['Class'].astype(int).apply(lambda x: 1 if x == 2 else 0).astype(int)
-        data = data.drop(columns=['Class'])
-
-        data = pd.get_dummies(data)
-        data = data.drop(columns=['job_unknown', 'marital_single', 'contact_unknown', 'poutcome_unknown'])
-
-        for i in data.loc[data['housing'] == 1].index:
-            if random.random() < 0.5:
-                data.loc[i, 'y'] = 1 - data.loc[i, 'y']
-
+        data = format_bank()
 
     X = data.drop('y', axis=1)
     y = data['y']
