@@ -69,10 +69,6 @@ def format_phishing():
         if data[col].value_counts().shape[0] == 2:
             data[col] = data[col].apply(lambda x: 1 if x == 1 else 0)
 
-    # for i in data.loc[data['having_IP_Address'] == 0].index:
-    #     if random.random() < 0.5:
-    #         data.loc[i, 'Result'] = 1 - data.loc[i, 'Result']
-
     data['y'] = data['Result']
     data = data.drop('Result', axis=1)
 
@@ -125,9 +121,25 @@ def format_bank():
     data = pd.get_dummies(data)
     data = data.drop(columns=['job_unknown', 'marital_single', 'contact_unknown', 'poutcome_unknown'])
 
-    # for i in data.loc[data['housing'] == 1].index:
-    #     if random.random() < 0.5:
-    #         data.loc[i, 'y'] = 1 - data.loc[i, 'y']
+    return data
+
+def format_monks(n):
+    if n == 1:
+        data, _, _, _ = openml.datasets.get_dataset(333).get_data(dataset_format="dataframe")
+    elif n == 2:
+        data, _, _, _ = openml.datasets.get_dataset(334).get_data(dataset_format="dataframe")
+    data = data.astype(int)
+
+    data[['attr1', 'attr2', 'attr3', 'attr4', 'attr5', 'attr6']] = data[['attr1', 'attr2', 'attr3', 'attr4', 'attr5', 'attr6']].apply(lambda x: x-1)
+    data = data.rename(columns={'class': 'y'})
+
+    return data
+
+def format_biodeg():
+    data, _, _, _ = openml.datasets.get_dataset(1494).get_data(dataset_format="dataframe")
+
+    data['y'] = data['Class'].map({'1':0, '2':1}).astype(int)
+    data = data.drop(columns=['Class'])
 
     return data
 
@@ -170,6 +182,12 @@ def get_data(dataset):
         data = format_titanic()
     elif dataset == 'bank':
         data = format_bank()
+    elif dataset == 'monks1':
+        data = format_monks(1)
+    elif dataset == 'monks2':
+        data = format_monks(2)
+    elif dataset == 'biodeg':
+        data = format_biodeg()
 
     X = data.drop('y', axis=1)
     y = data['y']

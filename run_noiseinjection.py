@@ -25,7 +25,7 @@ if __name__ == '__main__':
     np.random.seed(0)
 
     parser = argparse.ArgumentParser(description='Label correction testing.')
-    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['phishing', 'bank'])
+    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['phishing', 'bank', 'monks1', 'monks2', 'biodeg'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
     parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
