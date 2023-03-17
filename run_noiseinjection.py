@@ -13,6 +13,7 @@ from format_data import get_data
 from sklearn.model_selection import train_test_split
 from noise_injection import inject_noise
 from tqdm import tqdm
+from fairlearn.metrics import equalized_odds_difference, false_negative_rate, false_positive_rate
 
 logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger(__name__)
@@ -73,9 +74,7 @@ if __name__ == '__main__':
                         mlflow.log_param('noise_rate', noise_rate)
                         mlflow.log_param('noise_type', noise_type)
                         mlflow.log_param('test_size', args.test_size)
-                        
                         label_correction_model.log_params()
-
                         mlflow.log_param('classifier', args.model)
 
                         if train_set == 'original':
@@ -83,7 +82,7 @@ if __name__ == '__main__':
 
                         elif train_set == 'noisy':
                             y_pred, y_pred_proba = fit_predict(X_train, y_train_noisy, X_test, args.model)
-                        
+                    
                         else:
                             if y_train_corrected.unique().shape[0] == 1:
                                 y_pred = y_test_corrected.copy()
@@ -92,16 +91,17 @@ if __name__ == '__main__':
                             else:
                                 y_pred, y_pred_proba = fit_predict(X_train, y_train_corrected, X_test, args.model)
                         
-                        mlflow.log_param('senstive_attr', args.sensitive_attr)
+                        y_pred = pd.Series(y_pred, index=y_test_corrected.index)
 
+                        mlflow.log_param('senstive_attr', args.sensitive_attr)
                         mlflow.log_metric('correction_acc', correction_acc)
                         mlflow.log_metric('correction_fpr', correction_fpr)
                         mlflow.log_metric('correction_fnr', correction_fnr)
 
                         if test_set == 'original':
                             evaluate(y_test, y_pred, y_pred_proba, X_test[args.sensitive_attr])
-                        if test_set == 'noisy':
+                        elif test_set == 'noisy':
                             evaluate(y_test_noisy, y_pred, y_pred_proba, X_test[args.sensitive_attr])
-                        else:
+                        else:                            
                             evaluate(y_test_corrected, y_pred, y_pred_proba, X_test[args.sensitive_attr])
 

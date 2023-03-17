@@ -28,7 +28,7 @@ def predictive_equality_difference(y_true, y_pred, sensitive_attr):
     y_true_1 = y_true[sensitive_attr == 1]
     y_pred_1 = y_pred[sensitive_attr == 1]
 
-    return abs(false_positive_rate(y_true_0, y_pred_0) - false_positive_rate(y_true_1, y_pred_1))
+    return abs(fp_rate(y_true_0, y_pred_0) - fp_rate(y_true_1, y_pred_1))
 
 def equal_opportunity_difference(y_true, y_pred, sensitive_attr):
     """
@@ -54,7 +54,33 @@ def equal_opportunity_difference(y_true, y_pred, sensitive_attr):
     y_true_1 = y_true[sensitive_attr == 1]
     y_pred_1 = y_pred[sensitive_attr == 1]
 
-    return abs(false_negative_rate(y_true_0, y_pred_0) - false_negative_rate(y_true_1, y_pred_1))
+    return abs(fn_rate(y_true_0, y_pred_0) - fn_rate(y_true_1, y_pred_1))
+
+def tp_rate(y_true, y_pred):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    return tp / (tp + fn)
+
+def fp_rate(y_true, y_pred):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    return fp / (fp + tn)
+
+def fn_rate(y_true, y_pred):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    return fn / (fn + tp)
+
+def eq_odds_difference(y_true, y_pred, sensitive_attr):
+    # TPR difference
+
+    tpr_0 = tp_rate(y_true.loc[sensitive_attr == 0], y_pred.loc[sensitive_attr == 0])
+    tpr_1 = tp_rate(y_true.loc[sensitive_attr == 1], y_pred.loc[sensitive_attr == 1])
+    tpr_diff = abs(tpr_0 - tpr_1)
+
+    # FPR difference
+    fpr_0 = fp_rate(y_true.loc[sensitive_attr == 0], y_pred.loc[sensitive_attr == 0])
+    fpr_1 = fp_rate(y_true.loc[sensitive_attr == 1], y_pred.loc[sensitive_attr == 1])
+    fpr_diff = abs(fpr_0 - fpr_1)
+
+    return max(tpr_diff, fpr_diff)
 
 def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
     """
@@ -73,7 +99,7 @@ def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
     if len(set(y_pred_proba)) > 1 and len(y_test.unique()) > 1:
         mlflow.log_metric("roc_auc", roc_auc_score(y_test, y_pred_proba))
     mlflow.log_metric("demographic_parity_difference", demographic_parity_difference(y_test, y_pred, sensitive_features=sensitive_attr))
-    mlflow.log_metric("equalized_odds_difference", equalized_odds_difference(y_test, y_pred, sensitive_features=sensitive_attr))
+    mlflow.log_metric("equalized_odds_difference", eq_odds_difference(y_test, y_pred, sensitive_attr))
     mlflow.log_metric("predictive_equality_difference", predictive_equality_difference(y_test, y_pred, sensitive_attr))
     mlflow.log_metric("equal_opportunity_difference", equal_opportunity_difference(y_test, y_pred, sensitive_attr))
 
