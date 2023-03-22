@@ -5,6 +5,8 @@ import random
 import mlflow
 import pandas as pd
 import numpy as np
+import os
+import pickle
 from datetime import datetime
 from label_correction import get_label_correction_model
 from train import fit_predict
@@ -57,15 +59,33 @@ if __name__ == '__main__':
         print(f'Applying {noise_type} noise')
         for noise_rate in tqdm([i/10 for i in range(1,10)]):
             # inject noise
-            y_train_noisy, noisy_train_labels = inject_noise(y_train, X_train[args.sensitive_attr], noise_rate, noise_type)
-            y_test_noisy, noisy_test_labels = inject_noise(y_test, X_test[args.sensitive_attr], noise_rate, noise_type)
+            dir = f'data/{args.dataset}_{args.sensitive_attr}/{noise_type}/{noise_rate}'
+            if os.path.exists(dir):
+                y_train_noisy = pd.read_csv(f'{dir}/train_labels.csv', index_col=0)['y']
+                y_test_noisy = pd.read_csv(f'{dir}/test_labels.csv', index_col=0)['y']
+            else:
+                y_train_noisy = inject_noise(y_train, X_train[args.sensitive_attr], noise_rate, noise_type)
+                y_test_noisy = inject_noise(y_test, X_test[args.sensitive_attr], noise_rate, noise_type)
+
+                if not os.path.exists(f'data/{args.dataset}_{args.sensitive_attr}'):
+                    os.mkdir(f'data/{args.dataset}_{args.sensitive_attr}')
+
+                if not os.path.exists(f'data/{args.dataset}_{args.sensitive_attr}/{noise_type}'):
+                    os.mkdir(f'data/{args.dataset}_{args.sensitive_attr}/{noise_type}')
+
+                if not os.path.exists(dir):
+                    os.mkdir(dir)
+
+                y_train_noisy.to_csv(f'{dir}/train_labels.csv', index=True)
+                y_test_noisy.to_csv(f'{dir}/test_labels.csv', index=True)
+                
 
             # correct labels
             label_correction_model = get_label_correction_model(args)
             y_train_corrected = label_correction_model.correct(X_train, y_train_noisy)
             y_test_corrected = label_correction_model.correct(X_test, y_test_noisy)
 
-            correction_acc, correction_fpr, correction_fnr = evaluate_correction(y, y_train_corrected, y_test_corrected, noisy_train_labels, noisy_test_labels)
+            correction_acc, correction_fpr, correction_fnr = evaluate_correction(y, y_train_corrected, y_test_corrected)
 
             for test_set in ['original', 'noisy', 'corrected']:
                 for train_set in ['original', 'noisy', 'corrected']:

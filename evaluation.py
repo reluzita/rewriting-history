@@ -58,14 +58,20 @@ def equal_opportunity_difference(y_true, y_pred, sensitive_attr):
 
 def tp_rate(y_true, y_pred):
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    if (tp + fn) == 0:
+        return 0
     return tp / (tp + fn)
 
 def fp_rate(y_true, y_pred):
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    if (fp + tn) == 0:
+        return 0
     return fp / (fp + tn)
 
 def fn_rate(y_true, y_pred):
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    if (fn + tp) == 0:
+        return 0
     return fn / (fn + tp)
 
 def eq_odds_difference(y_true, y_pred, sensitive_attr):
@@ -103,12 +109,12 @@ def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
     mlflow.log_metric("predictive_equality_difference", predictive_equality_difference(y_test, y_pred, sensitive_attr))
     mlflow.log_metric("equal_opportunity_difference", equal_opportunity_difference(y_test, y_pred, sensitive_attr))
 
-def evaluate_correction(y:pd.Series, y_train_corrected:pd.Series, y_test_corrected:pd.Series, noisy_train_labels, noisy_test_labels):
-    original_labels = y.loc[noisy_train_labels + noisy_test_labels].sort_index()
-    corrected_labels = pd.concat([y_train_corrected.loc[noisy_train_labels], y_test_corrected.loc[noisy_test_labels]]).sort_index()
+def evaluate_correction(y:pd.Series, y_train_corrected:pd.Series, y_test_corrected:pd.Series):
+    original_labels = y.sort_index()
+    corrected_labels = pd.concat([y_train_corrected, y_test_corrected]).sort_index()
     
     acc = accuracy_score(original_labels.values, corrected_labels.values)
-    fpr = false_positive_rate(original_labels.values, corrected_labels.values)
-    fnr = false_negative_rate(original_labels.values, corrected_labels.values)
+    fpr = fp_rate(original_labels.values, corrected_labels.values)
+    fnr = fn_rate(original_labels.values, corrected_labels.values)
 
     return acc, fpr, fnr
