@@ -13,7 +13,7 @@ from train import fit_predict
 from evaluation import evaluate, evaluate_correction
 from format_data import get_data
 from sklearn.model_selection import train_test_split
-from noise_injection import inject_noise
+from noise_injection import get_noisy_labels
 from tqdm import tqdm
 from fairlearn.metrics import equalized_odds_difference, false_negative_rate, false_positive_rate
 
@@ -28,9 +28,10 @@ if __name__ == '__main__':
     np.random.seed(0)
 
     parser = argparse.ArgumentParser(description='Label correction testing.')
-    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['phishing', 'bank', 'monks1', 'monks2', 'biodeg'])
+    parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['phishing', 'bank', 'monks1', 'monks2', 'biodeg', 'credit', 'sick', 'churn', 'vote', 'ads', 'soil'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
     parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE'])
+    parser.add_argument('noise_type', type=str, help='Noise type', choices=['random', 'flip', 'bias', 'balanced_bias'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg', 'DT'])
     parser.add_argument('--n_folds', type=int, help='Number of folds to use in PL and STC correction algorithms', required=False, default=10)
@@ -55,73 +56,54 @@ if __name__ == '__main__':
     # split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=0, stratify=y)
 
-    for noise_type in ['flip', 'bias']:
-        print(f'Applying {noise_type} noise')
-        for noise_rate in tqdm([i/10 for i in range(1,10)]):
-            # inject noise
-            dir = f'data/{args.dataset}_{args.sensitive_attr}/{noise_type}/{noise_rate}'
-            if os.path.exists(dir):
-                y_train_noisy = pd.read_csv(f'{dir}/train_labels.csv', index_col=0)['y']
-                y_test_noisy = pd.read_csv(f'{dir}/test_labels.csv', index_col=0)['y']
-            else:
-                y_train_noisy = inject_noise(y_train, X_train[args.sensitive_attr], noise_rate, noise_type)
-                y_test_noisy = inject_noise(y_test, X_test[args.sensitive_attr], noise_rate, noise_type)
+    print(f'Applying {args.noise_type} noise')
+    for noise_rate in tqdm([i/10 for i in range(1,10)]):
+        # inject noise
+        y_train_noisy = get_noisy_labels(args.noise_type, noise_rate, args.dataset, args.sensitive_attr, y_train, X_train[args.sensitive_attr], 'train')
+        y_test_noisy = get_noisy_labels(args.noise_type, noise_rate, args.dataset, args.sensitive_attr, y_test, X_test[args.sensitive_attr], 'test')
 
-                if not os.path.exists(f'data/{args.dataset}_{args.sensitive_attr}'):
-                    os.mkdir(f'data/{args.dataset}_{args.sensitive_attr}')
+        # correct labels
+        label_correction_model = get_label_correction_model(args)
+        y_train_corrected = label_correction_model.correct(X_train, y_train_noisy)
+        y_test_corrected = label_correction_model.correct(X_test, y_test_noisy)
 
-                if not os.path.exists(f'data/{args.dataset}_{args.sensitive_attr}/{noise_type}'):
-                    os.mkdir(f'data/{args.dataset}_{args.sensitive_attr}/{noise_type}')
+        correction_acc, correction_fpr, correction_fnr = evaluate_correction(y, y_train_corrected, y_test_corrected)
 
-                if not os.path.exists(dir):
-                    os.mkdir(dir)
+        for test_set in ['original', 'noisy', 'corrected']:
+            for train_set in ['original', 'noisy', 'corrected']:
+                with mlflow.start_run(tags={'train_set':train_set, 'test_set':test_set, 'run':run_tag}) as run:
+                    mlflow.log_param('dataset', args.dataset)
+                    mlflow.log_param('noise_rate', noise_rate)
+                    mlflow.log_param('noise_type', args.noise_type)
+                    mlflow.log_param('test_size', args.test_size)
+                    label_correction_model.log_params()
+                    mlflow.log_param('classifier', args.model)
 
-                y_train_noisy.to_csv(f'{dir}/train_labels.csv', index=True)
-                y_test_noisy.to_csv(f'{dir}/test_labels.csv', index=True)
+                    if train_set == 'original':
+                        y_pred, y_pred_proba = fit_predict(X_train, y_train, X_test, args.model)
+
+                    elif train_set == 'noisy':
+                        y_pred, y_pred_proba = fit_predict(X_train, y_train_noisy, X_test, args.model)
                 
-
-            # correct labels
-            label_correction_model = get_label_correction_model(args)
-            y_train_corrected = label_correction_model.correct(X_train, y_train_noisy)
-            y_test_corrected = label_correction_model.correct(X_test, y_test_noisy)
-
-            correction_acc, correction_fpr, correction_fnr = evaluate_correction(y, y_train_corrected, y_test_corrected)
-
-            for test_set in ['original', 'noisy', 'corrected']:
-                for train_set in ['original', 'noisy', 'corrected']:
-                    with mlflow.start_run(tags={'train_set':train_set, 'test_set':test_set, 'run':run_tag}) as run:
-                        mlflow.log_param('dataset', args.dataset)
-                        mlflow.log_param('noise_rate', noise_rate)
-                        mlflow.log_param('noise_type', noise_type)
-                        mlflow.log_param('test_size', args.test_size)
-                        label_correction_model.log_params()
-                        mlflow.log_param('classifier', args.model)
-
-                        if train_set == 'original':
-                            y_pred, y_pred_proba = fit_predict(X_train, y_train, X_test, args.model)
-
-                        elif train_set == 'noisy':
-                            y_pred, y_pred_proba = fit_predict(X_train, y_train_noisy, X_test, args.model)
-                    
+                    else:
+                        if y_train_corrected.unique().shape[0] == 1:
+                            y_pred = y_test_corrected.copy()
+                            y_pred_proba = y_test_corrected.copy()
+                            print('After noise correction all labels are the same')
                         else:
-                            if y_train_corrected.unique().shape[0] == 1:
-                                y_pred = y_test_corrected.copy()
-                                y_pred_proba = y_test_corrected.copy()
-                                print('After noise correction all labels are the same')
-                            else:
-                                y_pred, y_pred_proba = fit_predict(X_train, y_train_corrected, X_test, args.model)
-                        
-                        y_pred = pd.Series(y_pred, index=y_test_corrected.index)
+                            y_pred, y_pred_proba = fit_predict(X_train, y_train_corrected, X_test, args.model)
+                    
+                    y_pred = pd.Series(y_pred, index=y_test_corrected.index)
 
-                        mlflow.log_param('senstive_attr', args.sensitive_attr)
-                        mlflow.log_metric('correction_acc', correction_acc)
-                        mlflow.log_metric('correction_fpr', correction_fpr)
-                        mlflow.log_metric('correction_fnr', correction_fnr)
+                    mlflow.log_param('senstive_attr', args.sensitive_attr)
+                    mlflow.log_metric('correction_acc', correction_acc)
+                    mlflow.log_metric('correction_fpr', correction_fpr)
+                    mlflow.log_metric('correction_fnr', correction_fnr)
 
-                        if test_set == 'original':
-                            evaluate(y_test, y_pred, y_pred_proba, X_test[args.sensitive_attr])
-                        elif test_set == 'noisy':
-                            evaluate(y_test_noisy, y_pred, y_pred_proba, X_test[args.sensitive_attr])
-                        else:                            
-                            evaluate(y_test_corrected, y_pred, y_pred_proba, X_test[args.sensitive_attr])
+                    if test_set == 'original':
+                        evaluate(y_test, y_pred, y_pred_proba, X_test[args.sensitive_attr])
+                    elif test_set == 'noisy':
+                        evaluate(y_test_noisy, y_pred, y_pred_proba, X_test[args.sensitive_attr])
+                    else:                            
+                        evaluate(y_test_corrected, y_pred, y_pred_proba, X_test[args.sensitive_attr])
 

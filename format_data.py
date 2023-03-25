@@ -143,6 +143,76 @@ def format_biodeg():
 
     return data
 
+def format_credit():
+    data, _, _, _ = openml.datasets.get_dataset(29).get_data(dataset_format="dataframe")
+    data = data.dropna()
+
+    data['A1'] = data['A1'].map({'a':1, 'b':0}).astype(int)
+    for col in ['A9' ,'A10', 'A12']:
+        data[col] = data[col].map({'t':1, 'f':0}).astype(int)
+    data['y'] = data['class'].map({'-':0, '+':1}).astype(int)
+    data = data.drop(columns=['class'])
+
+    data = pd.get_dummies(data)
+
+    return data
+
+def format_sick():
+    data, _, _, _ = openml.datasets.get_dataset(38).get_data(dataset_format="dataframe")
+
+    data = data.drop(columns=['TBG', 'TBG_measured', 'TSH_measured', 'T3_measured', 'TT4_measured', 'T4U_measured', 'FTI_measured'])
+    data = data.dropna()
+    data['sex'] = data['sex'].map({'F':0, 'M':1}).astype(int)
+    for col in ['on_thyroxine', 'query_on_thyroxine', 'on_antithyroid_medication', 'sick', 'pregnant', 'thyroid_surgery', 'I131_treatment', 'query_hypothyroid', 'query_hyperthyroid', 'lithium', 'goitre', 'tumor', 'hypopituitary', 'psych']:
+        data[col] = data[col].map({'f':0, 't':1}).astype(int)
+    data['y'] = data['Class'].map({'negative':0, 'sick':1}).astype(int)
+    data = data.drop(columns='Class')
+    data = pd.get_dummies(data)
+
+    return data
+
+def format_churn():
+    data, _, _, _ = openml.datasets.get_dataset(40701).get_data(dataset_format="dataframe")
+    for col in ['international_plan', 'voice_mail_plan', 'number_customer_service_calls']:
+        data[col] = data[col].astype(int)
+    data['y'] = data['class'].astype(int)
+    data = data.drop(columns='class')
+    data = pd.get_dummies(data)
+
+    return data
+
+def format_vote():
+    data, _, _, _ = openml.datasets.get_dataset(56).get_data(dataset_format="dataframe")
+    data = data.drop(columns=['water-project-cost-sharing', 'export-administration-act-south-africa'])
+    data = data.dropna()
+    for col in data.columns:
+        if col != 'Class':
+            data[col] = data[col].map({'n':0, 'y':1}).astype(int)
+
+    data['y'] = data['Class'].map({'republican':0, 'democrat':1}).astype(int)
+    data = data.drop(columns=['Class'])
+
+    return data
+
+def format_ads():
+    data, _, _, _ = openml.datasets.get_dataset(40978).get_data(dataset_format="dataframe")
+    data['y'] = data['class'].map({'noad':0, 'ad':1}).astype(int)
+    data = data.drop(columns=['class'])
+    data = data.astype(int)
+
+    return data
+
+def format_soil():
+    data, _, _, _ = openml.datasets.get_dataset(923).get_data(dataset_format="dataframe")
+    data['isns'] = data['isns'].astype(int)
+    data['y'] = data['binaryClass'].map({'N':0, 'P':1}).astype(int)
+    data = data.drop(columns=['binaryClass'])
+
+    return data
+
+
+
+
 def get_data(dataset):
     """
     Get dataset from OpenML, format it for the experiments and save it to a csv file
@@ -188,6 +258,18 @@ def get_data(dataset):
         data = format_monks(2)
     elif dataset == 'biodeg':
         data = format_biodeg()
+    elif dataset == 'credit':
+        data = format_credit()
+    elif dataset == 'sick':
+        data = format_sick()
+    elif dataset == 'churn':
+        data = format_churn()
+    elif dataset == 'vote':
+        data = format_vote()
+    elif dataset == 'ads':
+        data = format_ads()
+    elif dataset == 'soil':
+        data = format_soil()
 
     X = data.drop('y', axis=1)
     y = data['y']
