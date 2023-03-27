@@ -1,5 +1,5 @@
 fairness_results/
-noise_injection_results/
+noiseinjection_results/
 data/
 test/
 mlruns/

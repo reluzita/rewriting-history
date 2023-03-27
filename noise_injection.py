@@ -3,6 +3,32 @@ import random
 import os
 
 def get_noisy_labels(noise_type, noise_rate, dataset, sensitive_attr, y, group, set):
+    """
+    Read saved noisy labels or generate noisy labels from clean labels
+
+    Parameters
+    ----------
+    noise_type : str
+        Type of noise to inject
+    noise_rate : float
+        Amount of noise to inject
+    dataset : str
+        Dataset name
+    sensitive_attr : str
+        Sensitive attribute name
+    y : pd.Series
+        Clean labels
+    group : pd.Series
+        Sensitive attribute values
+    set : str
+        Dataset split
+
+    Returns
+    -------
+    pd.Series
+        Noisy labels
+    """
+
     dir = f'data/{dataset}_{sensitive_attr}/{noise_type}/{noise_rate}'
 
     if os.path.exists(f'{dir}/{set}_labels.csv'):
@@ -24,6 +50,25 @@ def get_noisy_labels(noise_type, noise_rate, dataset, sensitive_attr, y, group, 
 
 
 def inject_noise(y:pd.Series, group:pd.Series, noise_type, noise_rate):
+    """
+    Inject noise into clean labels
+
+    Parameters
+    ----------
+    y : pd.Series
+        Clean labels
+    group : pd.Series
+        Sensitive attribute values
+    noise_type : str
+        Type of noise to inject
+    noise_rate : float
+        Amount of noise to inject
+
+    Returns
+    -------
+    pd.Series
+        Noisy labels
+    """
     if noise_type == 'random':
         return random_noise(y, noise_rate)
     elif noise_type == 'flip':

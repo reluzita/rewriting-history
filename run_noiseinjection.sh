@@ -7,7 +7,7 @@
 # python run_noiseinjection.py bank housing OBNC random  
 # python run_noiseinjection.py bank housing BE random
 
-python run_noiseinjection.py phishing having_IP_Address PL random  
+# python run_noiseinjection.py phishing having_IP_Address PL random  
 # python run_noiseinjection.py phishing having_IP_Address STC random  
 # python run_noiseinjection.py phishing having_IP_Address CC random 
 # python run_noiseinjection.py phishing having_IP_Address HLNC random  
@@ -86,7 +86,7 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py bank housing OBNC flip  
 # python run_noiseinjection.py bank housing BE flip
 
-python run_noiseinjection.py phishing having_IP_Address PL flip  
+# python run_noiseinjection.py phishing having_IP_Address PL flip  
 # python run_noiseinjection.py phishing having_IP_Address STC flip  
 # python run_noiseinjection.py phishing having_IP_Address CC flip 
 # python run_noiseinjection.py phishing having_IP_Address HLNC flip  
@@ -165,7 +165,7 @@ python run_noiseinjection.py phishing having_IP_Address PL flip
 # python run_noiseinjection.py bank housing OBNC bias  
 # python run_noiseinjection.py bank housing BE bias
 
-python run_noiseinjection.py phishing having_IP_Address PL bias  
+# python run_noiseinjection.py phishing having_IP_Address PL bias  
 # python run_noiseinjection.py phishing having_IP_Address STC bias  
 # python run_noiseinjection.py phishing having_IP_Address CC bias 
 # python run_noiseinjection.py phishing having_IP_Address HLNC bias  
@@ -244,7 +244,7 @@ python run_noiseinjection.py phishing having_IP_Address PL bias
 # python run_noiseinjection.py bank housing OBNC balanced_bias  
 # python run_noiseinjection.py bank housing BE balanced_bias
 
-python run_noiseinjection.py phishing having_IP_Address PL balanced_bias  
+# python run_noiseinjection.py phishing having_IP_Address PL balanced_bias  
 # python run_noiseinjection.py phishing having_IP_Address STC balanced_bias  
 # python run_noiseinjection.py phishing having_IP_Address CC balanced_bias 
 # python run_noiseinjection.py phishing having_IP_Address HLNC balanced_bias  

@@ -57,24 +57,86 @@ def equal_opportunity_difference(y_true, y_pred, sensitive_attr):
     return abs(fn_rate(y_true_0, y_pred_0) - fn_rate(y_true_1, y_pred_1))
 
 def tp_rate(y_true, y_pred):
+    """
+    True positive rate
+
+    Parameters
+    ----------
+    y_true : pd.Series
+        True labels
+    y_pred : pd.Series
+        Predicted labels
+
+    Returns
+    -------
+    float
+        True positive rate
+    """
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     if (tp + fn) == 0:
         return 0
     return tp / (tp + fn)
 
 def fp_rate(y_true, y_pred):
+    """
+    False positive rate
+
+    Parameters
+    ----------
+    y_true : pd.Series
+        True labels
+    y_pred : pd.Series
+        Predicted labels
+
+    Returns
+    -------
+    float
+        False positive rate
+    """
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     if (fp + tn) == 0:
         return 0
     return fp / (fp + tn)
 
 def fn_rate(y_true, y_pred):
+    """
+    False negative rate
+
+    Parameters
+    ----------
+    y_true : pd.Series
+        True labels
+    y_pred : pd.Series
+        Predicted labels
+
+    Returns
+    -------
+    float
+        False negative rate
+    """
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     if (fn + tp) == 0:
         return 0
     return fn / (fn + tp)
 
 def eq_odds_difference(y_true, y_pred, sensitive_attr):
+    """
+    Equalized odds difference
+
+    Parameters
+    ----------
+    y_true : pd.Series
+        True labels
+    y_pred : pd.Series
+        Predicted labels
+    sensitive_attr : pd.Series
+        Sensitive attribute
+
+    Returns
+    -------
+    float
+        Equalized odds difference
+    """
     # TPR difference
 
     tpr_0 = tp_rate(y_true.loc[sensitive_attr == 0], y_pred.loc[sensitive_attr == 0])
@@ -98,6 +160,8 @@ def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
         True labels
     y_pred : pd.Series
         Predicted labels
+    y_pred_proba : pd.Series
+        Predicted positive label probabilities
     sensitive_attr : pd.Series
         Sensitive attribute
     """
@@ -110,6 +174,27 @@ def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
     mlflow.log_metric("equal_opportunity_difference", equal_opportunity_difference(y_test, y_pred, sensitive_attr))
 
 def evaluate_correction(y:pd.Series, y_train_corrected:pd.Series, y_test_corrected:pd.Series):
+    """
+    Evaluate the similarity of the corrected labels to the original ones
+
+    Parameters
+    ----------
+    y : pd.Series
+        Original labels
+    y_train_corrected : pd.Series
+        Corrected training labels
+    y_test_corrected : pd.Series
+        Corrected test labels
+
+    Returns
+    -------
+    float
+        Accuracy
+    float
+        False positive rate
+    float
+        False negative rate
+    """
     original_labels = y.sort_index()
     corrected_labels = pd.concat([y_train_corrected, y_test_corrected]).sort_index()
     
