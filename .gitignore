@@ -2,6 +2,7 @@ fairness_results/
 data/
 test/
 mlruns/
+plots/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
