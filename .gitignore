@@ -3,6 +3,12 @@ data/
 test/
 mlruns/
 plots/
+maintenance.ipynb 
+noiseinjection_fixes.py 
+test.ipynb 
+result_analysis/ecai_plots.ipynb 
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
