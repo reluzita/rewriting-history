@@ -66,6 +66,12 @@ if __name__ == '__main__':
         label_correction_model = get_label_correction_model(args)
         y_train_corrected = label_correction_model.correct(X_train, y_train_noisy)
         y_test_corrected = label_correction_model.correct(X_test, y_test_noisy)
+ 
+        if not os.path.exists(f'correction/{args.dataset}_{args.sensitive_attr}'):
+            os.makedirs(f'correction/{args.dataset}_{args.sensitive_attr}')
+        
+        y_train_corrected.to_csv(f'correction/{args.dataset}_{args.sensitive_attr}/{args.correction_alg}_train.csv', index=True)
+        y_test_corrected.to_csv(f'correction/{args.dataset}_{args.sensitive_attr}/{args.correction_alg}_test.csv', index=True)
 
         correction_acc, correction_fpr, correction_fnr = evaluate_correction(y, y_train_corrected, y_test_corrected)
 
@@ -93,7 +99,16 @@ if __name__ == '__main__':
                         else:
                             y_pred, y_pred_proba = fit_predict(X_train, y_train_corrected, X_test, args.model)
                     
-                    y_pred = pd.Series(y_pred, index=y_test_corrected.index)
+                    if not os.path.exists(f'predictions/{test_set}/{args.noise_type}/{noise_rate}/{args.dataset}_{args.sensitive_attr}'):
+                        os.makedirs(f'predictions/{test_set}/{args.noise_type}/{noise_rate}/{args.dataset}_{args.sensitive_attr}')
+
+                    if train_set == 'corrected':
+                        filename = args.correction_alg
+                    else:
+                        filename = train_set
+
+                    with open(f'predictions/{test_set}/{args.noise_type}/{noise_rate}/{args.dataset}_{args.sensitive_attr}/{filename}.pkl', 'wb') as f:
+                        pickle.dump(y_pred_proba, f)
 
                     mlflow.log_param('senstive_attr', args.sensitive_attr)
                     mlflow.log_metric('correction_acc', correction_acc)
@@ -101,9 +116,9 @@ if __name__ == '__main__':
                     mlflow.log_metric('correction_fnr', correction_fnr)
 
                     if test_set == 'original':
-                        evaluate(y_test, y_pred, y_pred_proba, X_test[args.sensitive_attr])
+                        evaluate(y_test, y_pred_proba, X_test[args.sensitive_attr])
                     elif test_set == 'noisy':
-                        evaluate(y_test_noisy, y_pred, y_pred_proba, X_test[args.sensitive_attr])
+                        evaluate(y_test_noisy, y_pred_proba, X_test[args.sensitive_attr])
                     else:                            
-                        evaluate(y_test_corrected, y_pred, y_pred_proba, X_test[args.sensitive_attr])
+                        evaluate(y_test_corrected, y_pred_proba, X_test[args.sensitive_attr])
 

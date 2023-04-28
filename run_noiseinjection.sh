@@ -21,19 +21,12 @@
 # python run_noiseinjection.py monks1 attr3 OBNC random  
 # python run_noiseinjection.py monks1 attr3 BE random 
 
-# python run_noiseinjection.py monks2 attr3 PL random  
-# python run_noiseinjection.py monks2 attr3 STC random  
-# python run_noiseinjection.py monks2 attr3 CC random  
-# python run_noiseinjection.py monks2 attr3 HLNC random  
-# python run_noiseinjection.py monks2 attr3 OBNC random  
-# python run_noiseinjection.py monks2 attr3 BE random
-
-# python run_noiseinjection.py biodeg V29 PL random  
-# python run_noiseinjection.py biodeg V29 STC random  
-# python run_noiseinjection.py biodeg V29 CC random 
-# python run_noiseinjection.py biodeg V29 HLNC random  
-# python run_noiseinjection.py biodeg V29 OBNC random  
-# python run_noiseinjection.py biodeg V29 BE random
+python run_noiseinjection.py biodeg V25 PL random  
+python run_noiseinjection.py biodeg V25 STC random  
+python run_noiseinjection.py biodeg V25 CC random 
+python run_noiseinjection.py biodeg V25 HLNC random  
+python run_noiseinjection.py biodeg V25 OBNC random  
+python run_noiseinjection.py biodeg V25 BE random
 
 # python run_noiseinjection.py credit A1 PL random  
 # python run_noiseinjection.py credit A1 STC random  
@@ -56,12 +49,12 @@
 # python run_noiseinjection.py churn voice_mail_plan OBNC random  
 # python run_noiseinjection.py churn voice_mail_plan BE random
 
-python run_noiseinjection.py vote crime PL random  
-python run_noiseinjection.py vote crime STC random  
-python run_noiseinjection.py vote crime CC random 
-python run_noiseinjection.py vote crime HLNC random  
-python run_noiseinjection.py vote crime OBNC random  
-python run_noiseinjection.py vote crime BE random
+python run_noiseinjection.py vote immigration PL random  
+python run_noiseinjection.py vote immigration STC random  
+python run_noiseinjection.py vote immigration CC random 
+python run_noiseinjection.py vote immigration HLNC random  
+python run_noiseinjection.py vote immigration OBNC random  
+python run_noiseinjection.py vote immigration BE random
 
 # python run_noiseinjection.py ads local PL random  
 # python run_noiseinjection.py ads local STC random  
@@ -100,19 +93,12 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py monks1 attr3 OBNC flip  
 # python run_noiseinjection.py monks1 attr3 BE flip 
 
-# python run_noiseinjection.py monks2 attr3 PL flip  
-# python run_noiseinjection.py monks2 attr3 STC flip  
-# python run_noiseinjection.py monks2 attr3 CC flip  
-# python run_noiseinjection.py monks2 attr3 HLNC flip  
-# python run_noiseinjection.py monks2 attr3 OBNC flip  
-# python run_noiseinjection.py monks2 attr3 BE flip
-
-# python run_noiseinjection.py biodeg V29 PL flip  
-# python run_noiseinjection.py biodeg V29 STC flip  
-# python run_noiseinjection.py biodeg V29 CC flip 
-# python run_noiseinjection.py biodeg V29 HLNC flip  
-# python run_noiseinjection.py biodeg V29 OBNC flip  
-# python run_noiseinjection.py biodeg V29 BE flip
+python run_noiseinjection.py biodeg V25 PL flip  
+python run_noiseinjection.py biodeg V25 STC flip  
+python run_noiseinjection.py biodeg V25 CC flip 
+python run_noiseinjection.py biodeg V25 HLNC flip  
+python run_noiseinjection.py biodeg V25 OBNC flip  
+python run_noiseinjection.py biodeg V25 BE flip
 
 # python run_noiseinjection.py credit A1 PL flip  
 # python run_noiseinjection.py credit A1 STC flip  
@@ -135,12 +121,12 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py churn voice_mail_plan OBNC flip  
 # python run_noiseinjection.py churn voice_mail_plan BE flip
 
-# python run_noiseinjection.py vote crime PL flip  
-# python run_noiseinjection.py vote crime STC flip  
-# python run_noiseinjection.py vote crime CC flip 
-# python run_noiseinjection.py vote crime HLNC flip  
-# python run_noiseinjection.py vote crime OBNC flip  
-# python run_noiseinjection.py vote crime BE flip
+python run_noiseinjection.py vote immigration PL flip  
+python run_noiseinjection.py vote immigration STC flip  
+python run_noiseinjection.py vote immigration CC flip 
+python run_noiseinjection.py vote immigration HLNC flip  
+python run_noiseinjection.py vote immigration OBNC flip  
+python run_noiseinjection.py vote immigration BE flip
 
 # python run_noiseinjection.py ads local PL flip  
 # python run_noiseinjection.py ads local STC flip  
@@ -179,19 +165,12 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py monks1 attr3 OBNC bias  
 # python run_noiseinjection.py monks1 attr3 BE bias 
 
-# python run_noiseinjection.py monks2 attr3 PL bias  
-# python run_noiseinjection.py monks2 attr3 STC bias  
-# python run_noiseinjection.py monks2 attr3 CC bias  
-# python run_noiseinjection.py monks2 attr3 HLNC bias  
-# python run_noiseinjection.py monks2 attr3 OBNC bias  
-# python run_noiseinjection.py monks2 attr3 BE bias
-
-# python run_noiseinjection.py biodeg V29 PL bias  
-# python run_noiseinjection.py biodeg V29 STC bias  
-# python run_noiseinjection.py biodeg V29 CC bias 
-# python run_noiseinjection.py biodeg V29 HLNC bias  
-# python run_noiseinjection.py biodeg V29 OBNC bias  
-# python run_noiseinjection.py biodeg V29 BE bias
+python run_noiseinjection.py biodeg V25 PL bias  
+python run_noiseinjection.py biodeg V25 STC bias  
+python run_noiseinjection.py biodeg V25 CC bias 
+python run_noiseinjection.py biodeg V25 HLNC bias  
+python run_noiseinjection.py biodeg V25 OBNC bias  
+python run_noiseinjection.py biodeg V25 BE bias
 
 # python run_noiseinjection.py credit A1 PL bias  
 # python run_noiseinjection.py credit A1 STC bias  
@@ -214,12 +193,12 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py churn voice_mail_plan OBNC bias  
 # python run_noiseinjection.py churn voice_mail_plan BE bias
 
-# python run_noiseinjection.py vote crime PL bias  
-# python run_noiseinjection.py vote crime STC bias  
-# python run_noiseinjection.py vote crime CC bias 
-# python run_noiseinjection.py vote crime HLNC bias  
-# python run_noiseinjection.py vote crime OBNC bias  
-# python run_noiseinjection.py vote crime BE bias
+python run_noiseinjection.py vote immigration PL bias  
+python run_noiseinjection.py vote immigration STC bias  
+python run_noiseinjection.py vote immigration CC bias 
+python run_noiseinjection.py vote immigration HLNC bias  
+python run_noiseinjection.py vote immigration OBNC bias  
+python run_noiseinjection.py vote immigration BE bias
 
 # python run_noiseinjection.py ads local PL bias  
 # python run_noiseinjection.py ads local STC bias  
@@ -258,19 +237,12 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py monks1 attr3 OBNC balanced_bias  
 # python run_noiseinjection.py monks1 attr3 BE balanced_bias 
 
-# python run_noiseinjection.py monks2 attr3 PL balanced_bias  
-# python run_noiseinjection.py monks2 attr3 STC balanced_bias  
-# python run_noiseinjection.py monks2 attr3 CC balanced_bias  
-# python run_noiseinjection.py monks2 attr3 HLNC balanced_bias  
-# python run_noiseinjection.py monks2 attr3 OBNC balanced_bias  
-# python run_noiseinjection.py monks2 attr3 BE balanced_bias
-
-# python run_noiseinjection.py biodeg V29 PL balanced_bias  
-# python run_noiseinjection.py biodeg V29 STC balanced_bias  
-# python run_noiseinjection.py biodeg V29 CC balanced_bias 
-# python run_noiseinjection.py biodeg V29 HLNC balanced_bias  
-# python run_noiseinjection.py biodeg V29 OBNC balanced_bias  
-# python run_noiseinjection.py biodeg V29 BE balanced_bias
+python run_noiseinjection.py biodeg V25 PL balanced_bias  
+python run_noiseinjection.py biodeg V25 STC balanced_bias  
+python run_noiseinjection.py biodeg V25 CC balanced_bias 
+python run_noiseinjection.py biodeg V25 HLNC balanced_bias  
+python run_noiseinjection.py biodeg V25 OBNC balanced_bias  
+python run_noiseinjection.py biodeg V25 BE balanced_bias
 
 # python run_noiseinjection.py credit A1 PL balanced_bias  
 # python run_noiseinjection.py credit A1 STC balanced_bias  
@@ -293,12 +265,12 @@ python run_noiseinjection.py vote crime BE random
 # python run_noiseinjection.py churn voice_mail_plan OBNC balanced_bias  
 # python run_noiseinjection.py churn voice_mail_plan BE balanced_bias
 
-# python run_noiseinjection.py vote crime PL balanced_bias  
-# python run_noiseinjection.py vote crime STC balanced_bias  
-# python run_noiseinjection.py vote crime CC balanced_bias 
-# python run_noiseinjection.py vote crime HLNC balanced_bias  
-# python run_noiseinjection.py vote crime OBNC balanced_bias  
-# python run_noiseinjection.py vote crime BE balanced_bias
+python run_noiseinjection.py vote immigration PL balanced_bias  
+python run_noiseinjection.py vote immigration STC balanced_bias  
+python run_noiseinjection.py vote immigration CC balanced_bias 
+python run_noiseinjection.py vote immigration HLNC balanced_bias  
+python run_noiseinjection.py vote immigration OBNC balanced_bias  
+python run_noiseinjection.py vote immigration BE balanced_bias
 
 # python run_noiseinjection.py ads local PL balanced_bias  
 # python run_noiseinjection.py ads local STC balanced_bias  

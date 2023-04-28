@@ -25,6 +25,7 @@ noise_type_colors = {
 pred_metrics = ['accuracy', 'roc_auc']
 
 fair_metrics = [
+        # 'auc_difference',
         'equal_opportunity_difference', 
         'predictive_equality_difference',
         'demographic_parity_difference',
@@ -42,8 +43,8 @@ def show_correction_performance(noise_type, algorithms, experiments, runs):
             for noise_rate in nr:
                 avg_value = []
                 for exp in experiments:
-                    run = runs[f'{exp}_{alg}']
-                    avg_value.append(run.loc[(run['params.noise_type'] == noise_type) & (run['params.noise_rate'] == noise_rate)][f'metrics.correction_{abbv[i]}'].mean())
+                    run = runs[noise_type][f'{exp}_{alg}']
+                    avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_{abbv[i]}'].mean())
                 values.append(np.mean(avg_value))
 
             axs[i].plot(nr, values, label=alg)
@@ -61,8 +62,8 @@ def show_correction_similarity(noise_type, algorithms, experiments, runs):
         for noise_rate in nr:
             avg_value = []
             for exp in experiments:
-                run = runs[f'{exp}_{alg}']
-                avg_value.append(run.loc[(run['params.noise_type'] == noise_type) & (run['params.noise_rate'] == noise_rate)][f'metrics.correction_acc'].mean())
+                run = runs[noise_type][f'{exp}_{alg}']
+                avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_acc'].mean())
             values.append(np.mean(avg_value))
 
         plt.plot(nr, values, label=alg)
@@ -87,8 +88,8 @@ def show_correction_similarity_errors(noise_type, algorithms, experiments, runs)
         for noise_rate in nr:
             avg_value = []
             for exp in experiments:
-                run = runs[f'{exp}_{alg}']
-                avg_value.append(run.loc[(run['params.noise_type'] == noise_type) & (run['params.noise_rate'] == noise_rate)][f'metrics.correction_acc'].mean())
+                run = runs[noise_type][f'{exp}_{alg}']
+                avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_acc'].mean())
             values.append(np.mean(avg_value))
             errors.append(np.std(avg_value))
 
@@ -118,8 +119,8 @@ def compare_noise_types(metric, algorithms, noise_types, experiments, runs):
             for noise_rate in nr:
                 avg_value = []
                 for exp in experiments:
-                    run = runs[f'{exp}_{alg}']
-                    avg_value.append(run.loc[(run['params.noise_type'] == noise_type) & (run['params.noise_rate'] == noise_rate)][f'metrics.correction_{metric}'].mean())
+                    run = runs[noise_type][f'{exp}_{alg}']
+                    avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_{metric}'].mean())
                 values.append(np.mean(avg_value))
             
             axs[row, col].plot(nr, values, label=noise_type)
@@ -150,8 +151,8 @@ def compare_correction_similarity(noise_types, algorithms, experiments, runs):
             for noise_rate in nr:
                 avg_value = []
                 for exp in experiments:
-                    run = runs[f'{exp}_{alg}']
-                    avg_value.append(run.loc[(run['params.noise_type'] == noise_types[i]) & (run['params.noise_rate'] == noise_rate)][f'metrics.correction_acc'].mean())
+                    run = runs[noise_types[i]][f'{exp}_{alg}']
+                    avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_acc'].mean())
                 values.append(np.mean(avg_value))
             
             ax.plot(nr, values, label=alg)
@@ -176,15 +177,15 @@ def compare_correction_similarity(noise_types, algorithms, experiments, runs):
 # Predictive performance comparison
 
 def show_metric(exp, noise_type, test_set, metric, ax, runs, algorithms):
-    run = runs[f'{exp}_PL']
-    run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == test_set)]
+    run = runs[noise_type][f'{exp}_PL']
+    run = run.loc[run['tags.test_set'] == test_set]
     if test_set == 'original':
         ax.plot(nr, [run.loc[(run['params.noise_rate'] == f'{noise_rate}') & (run['tags.train_set'] == 'original')][f'metrics.{metric}'].values[0] for noise_rate in nr], label='original', color='black', linestyle='--', linewidth=2)
     ax.plot(nr, [run.loc[(run['params.noise_rate'] == f'{noise_rate}') & (run['tags.train_set'] == 'noisy')][f'metrics.{metric}'].values[0] for noise_rate in nr], label='noisy', color='r', linestyle='--',linewidth=2)
 
     for alg in algorithms:
-        run = runs[f'{exp}_{alg}']
-        run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == test_set)]
+        run = runs[noise_type][f'{exp}_{alg}']
+        run = run.loc[run['tags.test_set'] == test_set]
         ax.plot(nr, [run.loc[(run['params.noise_rate'] == f'{noise_rate}') & (run['tags.train_set'] == 'corrected')][f'metrics.{metric}'].values[0] for noise_rate in nr], label=alg)
 
     ax.set_title(f'{test_set} test set')
@@ -204,25 +205,27 @@ def show_metric(exp, noise_type, test_set, metric, ax, runs, algorithms):
 #     plt.suptitle(f'{exp} - {metric} comparison ({noise_type} noise)', fontsize=16, y=1.05)
 #     plt.show()
 
-def show_metric_aggregated(noise_type, test_set, metric, ax, title, algorithms, experiments, runs, limit=False):
+def show_metric_aggregated(noise_type, test_set, metric, ax, title, algorithms, experiments, runs, limit=False, thresh=0.5):
     #ax.set_ylim([0, 1])
     results = {alg: {noise_rate: [] for noise_rate in nr} for alg in algorithms}
     results['noisy'] = {noise_rate: [] for noise_rate in nr}
     if test_set == 'original':
         results['original'] = {noise_rate: [] for noise_rate in nr}
 
+    metric_name = f'{metric}_{thresh}' if metric not in ['roc_auc', 'auc_difference'] else metric
+
     for exp in experiments:
-        run = runs[f'{exp}_PL']
-        run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == test_set)]
+        run = runs[noise_type][f'{exp}_PL']
+        run = run.loc[run['tags.test_set'] == test_set]
         for noise_rate in nr:
-            results['noisy'][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'noisy')][f'metrics.{metric}'].values[0])
+            results['noisy'][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'noisy')][f'metrics.{metric_name}'].values[0])
             if test_set == 'original':
-                results['original'][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'original')][f'metrics.{metric}'].values[0])
+                results['original'][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'original')][f'metrics.{metric_name}'].values[0])
         for alg in algorithms:
-            run = runs[f'{exp}_{alg}']
-            run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == test_set)]
+            run = runs[noise_type][f'{exp}_{alg}']
+            run = run.loc[run['tags.test_set'] == test_set]
             for noise_rate in nr:
-                results[alg][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric}'].values[0])
+                results[alg][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric_name}'].values[0])
 
     if test_set == 'original':       
         ax.plot(nr, [np.mean(results['original'][noise_rate]) for noise_rate in nr], label='original', color='black', linestyle='--', linewidth=2)
@@ -240,47 +243,36 @@ def show_metric_aggregated(noise_type, test_set, metric, ax, title, algorithms, 
         ax.set_ylim([0, 1])
     #ax.set_ylabel(f'{metric}')
 
-# def show_all_test_sets_aggr(noise_type, metric, algorithms, experiments, runs, limit=False):
-#     fig = plt.figure(figsize=(18, 5))
-#     axs = fig.subplots(1, 2, sharey=True)
-#     test_sets = ['original', 'noisy']
-
-#     for i in range(2):
-#         show_metric_aggregated(noise_type, test_sets[i], metric, axs[i], f'{test_sets[i]} test set', algorithms, experiments, runs, limit)
-
-    
-#     axs[0].legend(bbox_to_anchor=(2.5, 1))
-#     plt.suptitle(f'{metric} comparison ({noise_type} noise)', fontsize=16, y=1.05)
-#     plt.show()
-
-def show_all_metrics_pred(noise_type, test_set, algorithms, experiments, runs, limit=False):
+def show_all_metrics_pred(noise_type, test_set, algorithms, experiments, runs, limit=False, thresh=0.5):
     fig = plt.figure(figsize=(14, 4))
     axs = fig.subplots(1, 2, sharey=True)
 
     for i in range(2):
-        show_metric_aggregated(noise_type, test_set, pred_metrics[i], axs[i], f'{pred_metrics[i]}', algorithms, experiments, runs, limit)
+        show_metric_aggregated(noise_type, test_set, pred_metrics[i], axs[i], f'{pred_metrics[i]}', algorithms, experiments, runs, limit, thresh)
 
     
     axs[1].legend()
     plt.subplots_adjust(wspace=0.07)
     plt.show()
 
-def show_all_metrics_fair(noise_type, test_set, algorithms, experiments, runs, limit=False):
+def show_all_metrics_fair(noise_type, test_set, algorithms, experiments, runs, limit=False, thresh=0.5):
     fig = plt.figure(figsize=(23, 4))
     axs = fig.subplots(1, 4, sharey=True)
     
 
     for i in range(4):
-        show_metric_aggregated(noise_type, test_set, fair_metrics[i], axs[i], f'{fair_metrics[i]}', algorithms, experiments, runs, limit)
+        show_metric_aggregated(noise_type, test_set, fair_metrics[i], axs[i], f'{fair_metrics[i]}', algorithms, experiments, runs, limit, thresh)
 
     
     axs[0].legend(bbox_to_anchor=(4.5, 1))
     plt.subplots_adjust(wspace=0.07)
     plt.show()
 
-def show_corrected_test_performance(noise_type, metric, algorithms, experiments, runs):
+def show_corrected_test_performance(noise_type, metric, algorithms, experiments, runs, thresh=0.5):
     fig = plt.figure(figsize=(12, 8))
     axs = fig.subplots(3, 2, sharey=True, sharex=True)
+
+    metric_name = f'{metric}_{thresh}' if metric not in ['roc_auc', 'auc_difference'] else metric
 
     for i in range(6):
         row = i // 2
@@ -291,15 +283,15 @@ def show_corrected_test_performance(noise_type, metric, algorithms, experiments,
         results_original = {noise_rate: [] for noise_rate in nr}
 
         for exp in experiments:
-            run = runs[f'{exp}_{alg}']
-            run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == 'corrected')]
+            run = runs[noise_type][f'{exp}_{alg}']
+            run = run.loc[run['tags.test_set'] == 'corrected']
             for noise_rate in nr:
-                results[noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric}'].values[0])
+                results[noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric_name}'].values[0])
             
-            run = runs[f'{exp}_{alg}']
-            run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == 'original')]
+            run = runs[noise_type][f'{exp}_{alg}']
+            run = run.loc[run['tags.test_set'] == 'original']
             for noise_rate in nr:
-                results_original[noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric}'].values[0])
+                results_original[noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric_name}'].values[0])
             
         axs[row, col].plot(nr, [np.mean(results_original[noise_rate]) for noise_rate in nr], label='original test set', color='black', linestyle='--', linewidth=2)
         axs[row, col].errorbar(nr, [np.mean(results[noise_rate]) for noise_rate in nr], yerr=[np.std(results[noise_rate]) for noise_rate in nr] , label=f'{alg} corrected test set', color=colors[alg])
@@ -314,21 +306,23 @@ def show_corrected_test_performance(noise_type, metric, algorithms, experiments,
     plt.subplots_adjust(wspace=0.07, hspace=0.07)
     plt.show()
 
-def show_noise_types_performance(alg, test_set, metric, ax, nt, experiments, runs):
+def show_noise_types_performance(alg, test_set, metric, ax, nt, experiments, runs, thresh=0.5):
     results = {noise_type: {noise_rate: [] for noise_rate in nr} for noise_type in nt}
     if test_set == 'original':
         results['original'] = {noise_rate: [] for noise_rate in nr}
 
+    metric_name = f'{metric}_{thresh}' if metric not in ['roc_auc', 'auc_difference'] else metric
+
     for exp in experiments:
         for noise_type in nt:
-            run = runs[f'{exp}_{alg}']
-            run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == test_set)]
+            run = runs[noise_type][f'{exp}_{alg}']
+            run = run.loc[run['tags.test_set'] == test_set]
             for noise_rate in nr:
-                results[noise_type][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'noisy')][f'metrics.{metric}'].values[0])
+                results[noise_type][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'noisy')][f'metrics.{metric_name}'].values[0])
         
         if test_set == 'original':
             for noise_rate in nr:
-                results['original'][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'original')][f'metrics.{metric}'].values[0])
+                results['original'][noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'original')][f'metrics.{metric_name}'].values[0])
         
 
     if test_set == 'original':       
@@ -342,36 +336,36 @@ def show_noise_types_performance(alg, test_set, metric, ax, nt, experiments, run
     ax.set_xlabel('Noise rate')
     ax.set_ylabel(f'{metric}')
 
-def show_metric_alg(test_set, metric, algorithms, noise_types, experiments, runs):
+def show_metric_alg(test_set, metric, algorithms, noise_types, experiments, runs, thresh=0.5):
     fig = plt.figure(figsize=(18, 7))
     axs = fig.subplots(2, 3, sharey=True, sharex=True)
 
     for i in range(6):
-        show_noise_types_performance(algorithms[i], test_set, metric, axs[i // 3, i % 3], noise_types, experiments, runs)
+        show_noise_types_performance(algorithms[i], test_set, metric, axs[i // 3, i % 3], noise_types, experiments, runs, thresh)
 
     
     axs[1, 2].legend(bbox_to_anchor=(1.4, 1.5))
     plt.subplots_adjust(wspace=0.07)
     plt.show()
 
-def show_pred_metrics(test_set, alg, noise_types, experiments, runs):
+def show_pred_metrics(test_set, alg, noise_types, experiments, runs, thresh=0.5):
     fig = plt.figure(figsize=(12, 4))
     axs = fig.subplots(1, 2, sharey=True)
 
     for i in range(2):
-        show_noise_types_performance(alg, test_set, pred_metrics[i], axs[i], noise_types, experiments, runs)
+        show_noise_types_performance(alg, test_set, pred_metrics[i], axs[i], noise_types, experiments, runs, thresh)
 
     
     axs[1].legend(bbox_to_anchor=(1, 1))
     plt.subplots_adjust(wspace=0.07)
     plt.show()
 
-def show_fair_metrics(test_set, alg, experiments, runs):
+def show_fair_metrics(test_set, alg, experiments, runs, thresh=0.5):
     fig = plt.figure(figsize=(20, 4))
     axs = fig.subplots(1, 4, sharey=True)
 
     for i in range(4):
-        show_noise_types_performance(alg, test_set, fair_metrics[i], axs[i], ['bias', 'balanced_bias'], experiments, runs)
+        show_noise_types_performance(alg, test_set, fair_metrics[i], axs[i], ['bias', 'balanced_bias'], experiments, runs, thresh)
 
     
     axs[3].legend(bbox_to_anchor=(1, 1))
@@ -380,19 +374,23 @@ def show_fair_metrics(test_set, alg, experiments, runs):
 
 # Accuracy/fairness trade offs
 
-def show_trade_off(noise_type, pred_metric, fair_metric, test_set, noise_rate, ax, algorithms, experiments, runs, xlimit=None, ylimit=None):
+def show_trade_off(noise_type, pred_metric, fair_metric, test_set, noise_rate, ax, algorithms, experiments, runs, xlimit=None, ylimit=None, thresh=0.5):
     if test_set == 'original':
         train_sets = ['original', 'noisy']
     else:
         train_sets = ['noisy']
+
+    fair_metric_name = fair_metric if fair_metric == 'auc_difference' else f'{fair_metric}_{thresh}'
+    pred_metric_name = pred_metric if pred_metric == 'roc_auc' else f'{pred_metric}_{thresh}'
+
     for train_set in train_sets:
         predictive_performance = []
         fairness = []
         for exp in experiments:
-            run = runs[f'{exp}_PL']
-            run = run.loc[(run['params.noise_type'] == noise_type) & (run['tags.test_set'] == test_set) & (run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == train_set)]
-            predictive_performance.append(run[f'metrics.{pred_metric}'].values[0])
-            fairness.append(run[f'metrics.{fair_metric}'].values[0])
+            run = runs[noise_type][f'{exp}_PL']
+            run = run.loc[(run['tags.test_set'] == test_set) & (run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == train_set)]
+            predictive_performance.append(run[f'metrics.{pred_metric_name}'].values[0])
+            fairness.append(run[f'metrics.{fair_metric_name}'].values[0])
 
         if train_set == 'original':
             c = 'black'
@@ -408,10 +406,10 @@ def show_trade_off(noise_type, pred_metric, fair_metric, test_set, noise_rate, a
         predictive_performance = []
         fairness = []
         for exp in experiments:
-            run = runs[f'{exp}_{alg}']
-            run = run.loc[(run['params.noise_type'] == 'bias') & (run['tags.test_set'] == test_set) & (run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')]
-            predictive_performance.append(run[f'metrics.{pred_metric}'].values[0])
-            fairness.append(run[f'metrics.{fair_metric}'].values[0])
+            run = runs['bias'][f'{exp}_{alg}']
+            run = run.loc[(run['tags.test_set'] == test_set) & (run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')]
+            predictive_performance.append(run[f'metrics.{pred_metric_name}'].values[0])
+            fairness.append(run[f'metrics.{fair_metric_name}'].values[0])
         ax.scatter(np.mean(fairness), np.mean(predictive_performance), label=alg, s=40, c=colors[alg])
 
     if len(algorithms) == 1:
@@ -424,20 +422,20 @@ def show_trade_off(noise_type, pred_metric, fair_metric, test_set, noise_rate, a
     if ylimit:
         ax.set_ylim(ylimit)
 
-def show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit=None, ylimit=None):
+def show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit=None, ylimit=None, thresh=0.5):
     fig = plt.figure(figsize=(25, 8))
     axs = fig.subplots(2, 4, sharey=True, sharex=True)
 
     for i in range(8):
         row = i // 4
         col = i % 4
-        show_trade_off(noise_type, pred_metrics[row], fair_metrics[col], test_set, noise_rate, axs[row, col], algorithms, experiments, runs, xlimit, ylimit)
+        show_trade_off(noise_type, pred_metrics[row], fair_metrics[col], test_set, noise_rate, axs[row, col], algorithms, experiments, runs, xlimit, ylimit, thresh)
 
     axs[1, 3].legend()
     plt.suptitle(f'Noise rate: {noise_rate}', fontsize=16,y=0.95)
     plt.subplots_adjust(wspace=0.07)
 
-    path = f'plots/{noise_type}_{test_set}'
+    path = f'plots/{noise_type}_{test_set}_{thresh}'
     if len(algorithms) == 1:
         path += f'_{algorithms[0]}'
     if not os.path.exists(path):
@@ -446,30 +444,30 @@ def show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, exp
 
     plt.show()
 
-def create_gif(noise_type, test_set, alg=None):
+def create_gif(noise_type, test_set, thresh, alg=None):
     images = []
-    path = f'plots/{noise_type}_{test_set}'
+    path = f'plots/{noise_type}_{test_set}_{thresh}'
     if alg is not None:
         path += f'_{alg}'
     for i in range(1, 10):
         images.append(imageio.imread(f'{path}/{i}.png'))
     imageio.mimsave(f'{path}.gif', images, format='GIF', duration=0.3)
 
-def create_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, xlimit=None, ylimit=None):
+def create_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, xlimit=None, ylimit=None, thresh=0.5):
     for noise_rate in nr:
-        show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit, ylimit)
+        show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit, ylimit, thresh)
         
     if len(algorithms) == 1:
-        create_gif(noise_type, test_set, algorithms[0])
+        create_gif(noise_type, test_set, thresh, algorithms[0])
     else:
-        create_gif(noise_type, test_set)
+        create_gif(noise_type, test_set, thresh)
 
 
-def single_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, pred_metric, fair_metric, xlimit=None, ylimit=None):
+def single_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, pred_metric, fair_metric, xlimit=None, ylimit=None, thresh=0.5):
     for noise_rate in nr:
-        show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit, ylimit)
+        show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit, ylimit, thresh)
         
     if len(algorithms) == 1:
-        create_gif(noise_type, test_set, algorithms[0])
+        create_gif(noise_type, test_set, thresh, algorithms[0])
     else:
-        create_gif(noise_type, test_set)
+        create_gif(noise_type, test_set, thresh)

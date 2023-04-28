@@ -150,7 +150,36 @@ def eq_odds_difference(y_true, y_pred, sensitive_attr):
 
     return max(tpr_diff, fpr_diff)
 
-def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
+def auc_difference(y_true, y_pred_proba, sensitive_attr):
+    """
+    AUC difference
+
+    Parameters
+    ----------
+    y_true : pd.Series
+        True labels
+    y_pred_proba : numpy.ndarray
+        Predicted probabilities
+    sensitive_attr : pd.Series
+        Sensitive attribute
+
+    Returns
+    -------
+    float
+        AUC difference
+    """
+    try:
+        auc_0 = roc_auc_score(y_true.loc[sensitive_attr == 0], y_pred_proba.loc[sensitive_attr == 0])
+    except ValueError:
+        auc_0 = 0
+    try:
+        auc_1 = roc_auc_score(y_true.loc[sensitive_attr == 1], y_pred_proba.loc[sensitive_attr == 1])
+    except ValueError:
+        auc_1 = 0
+
+    return auc_0 - auc_1
+
+def evaluate(y_test:pd.Series, y_pred_proba, sensitive_attr):
     """
     Calculate and log evaluation metrics to MLflow
 
@@ -160,18 +189,23 @@ def evaluate(y_test:pd.Series, y_pred, y_pred_proba, sensitive_attr):
         True labels
     y_pred : pd.Series
         Predicted labels
-    y_pred_proba : pd.Series
+    y_pred_proba : numpy.ndarray
         Predicted positive label probabilities
     sensitive_attr : pd.Series
         Sensitive attribute
     """
-    mlflow.log_metric("accuracy", accuracy_score(y_test, y_pred))
     if len(set(y_pred_proba)) > 1 and len(y_test.unique()) > 1:
         mlflow.log_metric("roc_auc", roc_auc_score(y_test, y_pred_proba))
-    mlflow.log_metric("demographic_parity_difference", demographic_parity_difference(y_test, y_pred, sensitive_features=sensitive_attr))
-    mlflow.log_metric("equalized_odds_difference", eq_odds_difference(y_test, y_pred, sensitive_attr))
-    mlflow.log_metric("predictive_equality_difference", predictive_equality_difference(y_test, y_pred, sensitive_attr))
-    mlflow.log_metric("equal_opportunity_difference", equal_opportunity_difference(y_test, y_pred, sensitive_attr))
+        mlflow.log_metric("auc_difference", auc_difference(y_test, pd.Series(y_pred_proba, index=y_test.index), sensitive_attr))
+    
+    for thresh in [0.2, 0.5, 0.8]:
+        y_pred = pd.Series(np.where(y_pred_proba > thresh, 1, 0), index=y_test.index)
+
+        mlflow.log_metric(f"accuracy_{thresh}", accuracy_score(y_test, y_pred))
+        mlflow.log_metric(f"demographic_parity_difference_{thresh}", demographic_parity_difference(y_test, y_pred, sensitive_features=sensitive_attr))
+        mlflow.log_metric(f"equalized_odds_difference_{thresh}", eq_odds_difference(y_test, y_pred, sensitive_attr))
+        mlflow.log_metric(f"predictive_equality_difference_{thresh}", predictive_equality_difference(y_test, y_pred, sensitive_attr))
+        mlflow.log_metric(f"equal_opportunity_difference_{thresh}", equal_opportunity_difference(y_test, y_pred, sensitive_attr))
 
 def evaluate_correction(y:pd.Series, y_train_corrected:pd.Series, y_test_corrected:pd.Series):
     """
