@@ -3,6 +3,7 @@ data/
 test/
 mlruns/
 plots/
+thresh_plots/
 maintenance.ipynb 
 noiseinjection_fixes.py 
 test.ipynb 
@@ -10,7 +11,8 @@ result_analysis/ecai_plots.ipynb
 correction/
 predictions/
 noiseinjection_results/
-
+best_thresholds/
+ECAI/
 
 
 # Byte-compiled / optimized / DLL files
