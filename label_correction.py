@@ -334,24 +334,22 @@ class OrderingBasedCorrection(LabelCorrectionModel):
     threshold : float
         Threshold for the margin of the ensemble classifier
     """
-    def __init__(self, threshold):
-        self.threshold = threshold
+    def __init__(self, noise_rate):
+        self.noise_rate = noise_rate
 
     def calculate_margins(self, X, y, bagging:BaggingClassifier):
         margins = pd.Series(dtype=float)
         for i in X.index:
-            preds = pd.Series([dt.predict(X.loc[i].values.reshape(1, -1))[0] for dt in bagging.estimators_])
+            preds = [dt.predict(X.loc[i].values.reshape(1, -1))[0] for dt in bagging.estimators_]
             true_y = y.loc[i]
 
-            if true_y not in preds.unique():
-                v_y = 0
+            v_1 = sum(preds)
+            v_0 = len(preds) - v_1
+
+            if true_y == 1:
+                margins.loc[i] = (v_1 - v_0) / len(preds)
             else:
-                v_y = preds.value_counts().loc[true_y]
-                
-            v_c = len(preds) - v_y
-            
-            margin = (v_y - v_c) / len(preds)
-            margins.loc[i] = margin
+                margins.loc[i] = (v_0 - v_1) / len(preds)
 
         return margins
 
@@ -360,20 +358,83 @@ class OrderingBasedCorrection(LabelCorrectionModel):
 
         bagging = BaggingClassifier(n_estimators=100, random_state=42).fit(X, y)
         y_pred = pd.Series(bagging.predict(X), index=y.index)
-        misclassified = [i for i in y.index if y.loc[i] != y_pred.loc[i]]
 
-        margins = self.calculate_margins(X.loc[misclassified], y.loc[misclassified], bagging)
-        margins = margins.apply(lambda x: abs(x)).sort_values(ascending=False)
-
-        correct = margins.loc[margins > self.threshold].index
-        y_corrected.loc[correct] = y_pred.loc[correct]
+        margins = self.calculate_margins(X.loc[y != y_pred], y.loc[y != y_pred], bagging).apply(lambda x: abs(x)).sort_values(ascending=False)
+        index = margins.index[:int(self.noise_rate*len(margins))]
+        y_corrected.loc[index] = y_pred.loc[index]
 
         return y_corrected
     
     def log_params(self):
         mlflow.log_param('correction_alg', 'Ordering-Based Correction')
-        mlflow.log_param('threshold', self.threshold)
 
+class OBNCRemoveSensitive(OrderingBasedCorrection):
+    def __init__(self, noise_rate, sensitive_attr):
+        super().__init__(noise_rate)
+        self.sensitive_attr = sensitive_attr
+
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        y_corrected = y.copy()
+        X_fair = X.drop(columns=self.sensitive_attr)
+
+        bagging = BaggingClassifier(n_estimators=100, random_state=42).fit(X_fair, y)
+        y_pred = pd.Series(bagging.predict(X_fair), index=y.index)
+
+        margins = self.calculate_margins(X_fair.loc[y != y_pred], y.loc[y != y_pred], bagging).apply(lambda x: abs(x)).sort_values(ascending=False)
+        index = margins.index[:int(self.noise_rate*len(margins))]
+        y_corrected.loc[index] = y_pred.loc[index]
+
+        return y_corrected
+    
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Ordering-Based Correction (remove sensitive)')
+
+class OBNCOptimizeDemographicParity(OrderingBasedCorrection):
+    def __init__(self, noise_rate:float, sensitive_attr:str, prob:float):
+        super().__init__(noise_rate)
+        self.sensitive_attr = sensitive_attr
+        self.prob = prob
+
+    def dem_par_diff(self, X, y, attr):
+        p_y1_g1 = len(y.loc[(X[attr] == 1) & (y == 1)]) / len(y.loc[X[attr] == 1])
+        p_y1_g0 = len(y.loc[(X[attr] == 0) & (y == 1)]) / len(y.loc[X[attr] == 0])
+
+        return p_y1_g1 - p_y1_g0
+
+    def correct(self, X:pd.DataFrame, y:pd.Series):
+        y_corrected = y.copy()
+
+        bagging = BaggingClassifier(n_estimators=100, random_state=42).fit(X, y)
+        y_pred = pd.Series(bagging.predict(X), index=y.index)
+
+        margins = self.calculate_margins(X.loc[y != y_pred], y.loc[y != y_pred], bagging).apply(lambda x: abs(x)).sort_values(ascending=False)
+
+        dem_par = self.dem_par_diff(X, y, self.sensitive_attr)
+        n = int(self.noise_rate*len(margins))
+
+        if dem_par == 0:
+            y_corrected.loc[margins.index[:n]] = [(1 - y.loc[i]) for i in margins.index[:n]]
+
+        else:
+            corrected = 0
+            for i in margins.index:
+                if X.loc[i, self.sensitive_attr] == 0:
+                    if y.loc[i] == int(dem_par < 0) or np.random.random() < self.prob:
+                        y_corrected.loc[i] = y_pred.loc[i]
+                        corrected += 1
+                else:
+                    if y.loc[i] == int(dem_par > 0) or np.random.random() < self.prob:
+                        y_corrected.loc[i] =  y_pred.loc[i]
+                        corrected += 1
+                
+                if corrected == n:
+                    break
+
+        return y_corrected
+    
+    def log_params(self):
+        mlflow.log_param('correction_alg', 'Ordering-Based Correction (optimize demographic parity)')
+        mlflow.log_param('prob', self.prob)
 
 class BayesianEntropy(LabelCorrectionModel):
     """
@@ -454,7 +515,7 @@ class BayesianEntropy(LabelCorrectionModel):
         mlflow.log_param('alpha', self.alpha)
 
 
-def get_label_correction_model(args) -> LabelCorrectionModel:
+def get_label_correction_model(args, noise_rate) -> LabelCorrectionModel:
     """
     Initialize the label correction model
 
@@ -477,6 +538,10 @@ def get_label_correction_model(args) -> LabelCorrectionModel:
     elif args.correction_alg == 'HLNC':
         return HybridLabelNoiseCorrection(args.n_clusters)
     elif args.correction_alg == 'OBNC':
-        return OrderingBasedCorrection(args.threshold)
+        return OrderingBasedCorrection(noise_rate)
     elif args.correction_alg == 'BE':
         return BayesianEntropy(args.alpha, args.n_folds)
+    elif args.correction_alg == 'OBNC-remove-sensitive':
+        return OBNCRemoveSensitive(noise_rate, args.sensitive_attr)
+    elif args.correction_alg == 'OBNC-optimize-demographic-parity':
+        return OBNCOptimizeDemographicParity(noise_rate, args.sensitive_attr, args.prob)

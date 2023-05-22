@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Label correction testing.')
     parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['phishing', 'bank', 'monks1', 'monks2', 'biodeg', 'credit', 'sick', 'churn', 'vote', 'ads', 'soil'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
-    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE', 'fair-OBNC'])
+    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE', 'OBNC-remove-sensitive', 'OBNC-optimize-demographic-parity'])
     parser.add_argument('noise_type', type=str, help='Noise type', choices=['random', 'flip', 'bias', 'balanced_bias'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg', 'DT'])
@@ -41,6 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('--correction_rate', type=float, help='Correction rate for Self Training Correction', required=False, default=0.8)
     parser.add_argument('--threshold', type=float, help='Correction threshold for Ordering-based correction', required=False, default=0.2)
     parser.add_argument('--alpha', type=float, help='Alpha for Bayesian Entropy correction', required=False, default=0.25)
+    parser.add_argument('--prob', type=float, help='Probability for random correction for OBNC-optimize-demographic-parity', required=False, default=0)
 
     args = parser.parse_args()
 
@@ -57,13 +58,13 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=0, stratify=y)
 
     print(f'Applying {args.noise_type} noise')
-    for noise_rate in tqdm([i/10 for i in range(1,10)]):
+    for noise_rate in tqdm([i/10 for i in range(1,6)]):
         # inject noise
         y_train_noisy = get_noisy_labels(args.noise_type, noise_rate, args.dataset, args.sensitive_attr, y_train, X_train[args.sensitive_attr], 'train')
         y_test_noisy = get_noisy_labels(args.noise_type, noise_rate, args.dataset, args.sensitive_attr, y_test, X_test[args.sensitive_attr], 'test')
 
         # correct labels
-        label_correction_model = get_label_correction_model(args)
+        label_correction_model = get_label_correction_model(args, noise_rate)
         y_train_corrected = label_correction_model.correct(X_train, y_train_noisy)
         y_test_corrected = label_correction_model.correct(X_test, y_test_noisy)
  
