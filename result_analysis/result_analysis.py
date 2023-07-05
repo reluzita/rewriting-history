@@ -16,7 +16,23 @@ colors = {
     'BE':'tab:brown',
     'OBNC-remove-sensitive': 'tab:pink',
     'OBNC-optimize-demographic-parity-0': 'tab:cyan',
-    'OBNC-optimize-demographic-parity-0.5': 'tab:gray',
+    'OBNC-optimize-demographic-parity-0.5': 'darkcyan',
+    'OBNC-fair-0': 'tab:gray',
+    'OBNC-fair-0.5': 'dimgrey'
+}
+
+alg_names = {
+    'PL':'PL', 
+    'STC':'STC', 
+    'CC':'CC', 
+    'HLNC':'HLNC', 
+    'BE':'BE',
+    'OBNC': 'OBNC',
+    'OBNC-remove-sensitive': 'Fair-OBNC-rs',
+    'OBNC-optimize-demographic-parity-0': 'Fair-OBNC-dp',
+    'OBNC-optimize-demographic-parity-0.5': 'Fair-OBNC-dp (prob = 0.5)',
+    'OBNC-fair-0': 'Fair-OBNC',
+    'OBNC-fair-0.5': 'Fair-OBNC (prob = 0.5)'
 }
 
 noise_type_colors = {
@@ -58,7 +74,7 @@ def show_correction_performance(noise_type, algorithms, experiments, runs, nr):
                     avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_{abbv[i]}'].mean())
                 values.append(np.mean(avg_value))
 
-            axs[i].plot(nr, values, label=alg)
+            axs[i].plot(nr, values, label=alg, c=colors[alg])
         axs[i].set_xlabel('Noise rate')
         axs[i].set_title(f'% of {names[i]} labels after correction')
         axs[i].legend()
@@ -77,7 +93,7 @@ def show_correction_similarity(noise_type, algorithms, experiments, runs, nr):
                 avg_value.append(run.loc[run['params.noise_rate'] == noise_rate][f'metrics.correction_acc'].mean())
             values.append(np.mean(avg_value))
 
-        plt.plot(nr, values, label=alg)
+        plt.plot(nr, values, label=alg, c=colors[alg])
     plt.xlabel('Noise rate')
     plt.ylabel('Similarity (% of correct labels)')
     plt.title('Similarity to original labels after correction')
@@ -305,7 +321,7 @@ def show_corrected_test_performance(noise_type, metric, algorithms, experiments,
                 results_original[noise_rate].append(run.loc[(run['params.noise_rate'] == noise_rate) & (run['tags.train_set'] == 'corrected')][f'metrics.{metric_name}'].values[0])
             
         axs[row, col].plot(nr, [np.mean(results_original[noise_rate]) for noise_rate in nr], label='original test set', color='black', linestyle='--', linewidth=2)
-        axs[row, col].errorbar(nr, [np.mean(results[noise_rate]) for noise_rate in nr], yerr=[np.std(results[noise_rate]) for noise_rate in nr] , label=f'{alg} corrected test set', color=colors[alg])
+        axs[row, col].errorbar(nr, [np.mean(results[noise_rate]) for noise_rate in nr], yerr=[np.std(results[noise_rate]) for noise_rate in nr] , label=f'{alg_names[alg]} corrected test set', color=colors[alg])
 
         if row == 2:
             axs[row, col].set_xlabel('Noise rate')
@@ -457,12 +473,12 @@ def show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, exp
 
     plt.show()
 
-def create_gif(noise_type, test_set, thresh, alg=None):
+def create_gif(noise_type, test_set, thresh, nr, alg=None):
     images = []
     path = f'plots/{noise_type}_{test_set}_{thresh}'
     if alg is not None:
         path += f'_{alg}'
-    for i in range(1, 10):
+    for i in range(1, len(nr)+1):
         images.append(imageio.imread(f'{path}/{i}.png'))
     imageio.mimsave(f'{path}.gif', images, format='GIF', duration=0.3)
 
@@ -471,9 +487,9 @@ def create_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, nr
         show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit, ylimit, thresh)
         
     if len(algorithms) == 1:
-        create_gif(noise_type, test_set, thresh, algorithms[0])
+        create_gif(noise_type, test_set, thresh, nr, algorithms[0])
     else:
-        create_gif(noise_type, test_set, thresh)
+        create_gif(noise_type, test_set, thresh, nr)
 
 
 def single_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, nr, xlimit=None, ylimit=None, thresh=0.5):
@@ -481,6 +497,6 @@ def single_trade_off_gif(noise_type, test_set, algorithms, experiments, runs, nr
         show_trade_off_all_metrics(noise_type, noise_rate, test_set, algorithms, experiments, runs, xlimit, ylimit, thresh)
         
     if len(algorithms) == 1:
-        create_gif(noise_type, test_set, thresh, algorithms[0])
+        create_gif(noise_type, test_set, thresh, nr, algorithms[0])
     else:
-        create_gif(noise_type, test_set, thresh)
+        create_gif(noise_type, test_set, nr, thresh)

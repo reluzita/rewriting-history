@@ -1,19 +1,17 @@
-fairness_results/
 data/
-test/
 mlruns/
-plots/
-thresh_plots/
-maintenance.ipynb 
-noiseinjection_fixes.py 
-test.ipynb 
-result_analysis/ecai_plots.ipynb 
 correction/
 predictions/
 noiseinjection_results/
-best_thresholds/
-ECAI/
+fairness_benchmark_results/
 
+result_analysis/ecai_plots.ipynb 
+result_analysis/thesis_report/
+result_analysis/presentation/
+result_analysis/ECAI/
+result_analysis/plots/
+result_analysis/thresh_plots/
+result_analysis/best_thresholds/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

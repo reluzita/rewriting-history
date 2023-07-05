@@ -15,7 +15,6 @@ from format_data import get_data
 from sklearn.model_selection import train_test_split
 from noise_injection import get_noisy_labels
 from tqdm import tqdm
-from fairlearn.metrics import equalized_odds_difference, false_negative_rate, false_positive_rate
 
 logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger(__name__)
@@ -27,10 +26,10 @@ if __name__ == '__main__':
     random.seed(0)
     np.random.seed(0)
 
-    parser = argparse.ArgumentParser(description='Label correction testing.')
+    parser = argparse.ArgumentParser(description='Systematic evaluation of label noise correction methods with noise injection.')
     parser.add_argument('dataset', type=str, help='OpenML dataset id', choices=['phishing', 'bank', 'monks1', 'monks2', 'biodeg', 'credit', 'sick', 'churn', 'vote', 'ads', 'soil'])
     parser.add_argument('sensitive_attr', type=str, help='Sensitive attribute')
-    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE', 'OBNC-remove-sensitive', 'OBNC-optimize-demographic-parity'])
+    parser.add_argument('correction_alg', type=str, help='Label noise correction algorithm', choices=['PL', 'STC', 'CC', 'HLNC', 'OBNC', 'BE', 'OBNC-remove-sensitive', 'OBNC-optimize-demographic-parity', 'OBNC-fair'])
     parser.add_argument('noise_type', type=str, help='Noise type', choices=['random', 'flip', 'bias', 'balanced_bias'])
     parser.add_argument('--test_size', type=float, help='Test set size', required=False, default=0.2)
     parser.add_argument('--model', type=str, help='Classification algorithm to use', required=False, default='LogReg', choices=['LogReg', 'DT'])
@@ -39,7 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_clusters', type=int, help='Number of clusters to use in CC and HLNC correction algorithms', required=False, default=100)
     parser.add_argument('--base_classifier', type=str, help='Classification algorithm for label correction', required=False, default='LogReg', choices=['LogReg', 'DT'])
     parser.add_argument('--correction_rate', type=float, help='Correction rate for Self Training Correction', required=False, default=0.8)
-    parser.add_argument('--threshold', type=float, help='Correction threshold for Ordering-based correction', required=False, default=0.2)
+    parser.add_argument('--m', type=float, help='Percentage of labels to correct for Ordering-based correction', required=False, default=0.2)
     parser.add_argument('--alpha', type=float, help='Alpha for Bayesian Entropy correction', required=False, default=0.25)
     parser.add_argument('--prob', type=float, help='Probability for random correction for OBNC-optimize-demographic-parity', required=False, default=0)
 
@@ -64,15 +63,15 @@ if __name__ == '__main__':
         y_test_noisy = get_noisy_labels(args.noise_type, noise_rate, args.dataset, args.sensitive_attr, y_test, X_test[args.sensitive_attr], 'test')
 
         # correct labels
-        label_correction_model = get_label_correction_model(args, noise_rate)
+        label_correction_model = get_label_correction_model(args)
         y_train_corrected = label_correction_model.correct(X_train, y_train_noisy)
         y_test_corrected = label_correction_model.correct(X_test, y_test_noisy)
  
-        if not os.path.exists(f'correction/{args.dataset}_{args.sensitive_attr}'):
-            os.makedirs(f'correction/{args.dataset}_{args.sensitive_attr}')
+        if not os.path.exists(f'correction/{args.dataset}_{args.sensitive_attr}/{args.noise_type}/{noise_rate}'):
+            os.makedirs(f'correction/{args.dataset}_{args.sensitive_attr}/{args.noise_type}/{noise_rate}')
         
-        y_train_corrected.to_csv(f'correction/{args.dataset}_{args.sensitive_attr}/{args.correction_alg}_train.csv', index=True)
-        y_test_corrected.to_csv(f'correction/{args.dataset}_{args.sensitive_attr}/{args.correction_alg}_test.csv', index=True)
+        y_train_corrected.to_csv(f'correction/{args.dataset}_{args.sensitive_attr}/{args.noise_type}/{noise_rate}/{args.correction_alg}_train.csv', index=True)
+        y_test_corrected.to_csv(f'correction/{args.dataset}_{args.sensitive_attr}/{args.noise_type}/{noise_rate}/{args.correction_alg}_test.csv', index=True)
 
         correction_acc, correction_fpr, correction_fnr = evaluate_correction(y, y_train_corrected, y_test_corrected)
 
@@ -103,10 +102,7 @@ if __name__ == '__main__':
                     if not os.path.exists(f'predictions/{test_set}/{args.noise_type}/{noise_rate}/{args.dataset}_{args.sensitive_attr}'):
                         os.makedirs(f'predictions/{test_set}/{args.noise_type}/{noise_rate}/{args.dataset}_{args.sensitive_attr}')
 
-                    if train_set == 'corrected':
-                        filename = args.correction_alg
-                    else:
-                        filename = train_set
+                    filename = args.correction_alg if train_set == 'corrected' else train_set
 
                     with open(f'predictions/{test_set}/{args.noise_type}/{noise_rate}/{args.dataset}_{args.sensitive_attr}/{filename}.pkl', 'wb') as f:
                         pickle.dump(y_pred_proba, f)
